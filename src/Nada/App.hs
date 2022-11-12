@@ -8,10 +8,7 @@ import Nada.Types
 import Brick
 
 import Control.Monad.State
-import Data.Sequence (Seq(..))
 import qualified Data.Sequence as Seq
-import Data.Text (Text(..))
-import qualified Data.Text as Text
 import Data.Foldable (toList)
 import qualified Graphics.Vty as V
 
@@ -31,15 +28,15 @@ nadaAppDraw :: NadaState -> [Widget NadaId]
 nadaAppDraw (NadaState nadaState) = [vBox $ toList $ drawTodo <$> nadaState]
 
 appEvent :: BrickEvent NadaId e -> EventM NadaId NadaState ()
-appEvent ev@(MouseDown clickedId _ _ _) = do
-    NadaState state <- get
-    let todoIndex = Seq.findIndexL (\Todo{..} -> clickedId == todoId) state
+appEvent (MouseDown clickedId _ _ _) = do
+    NadaState nadaState <- get
+    let todoIndex = Seq.findIndexL (\Todo{..} -> clickedId == todoId) nadaState
     case todoIndex of
       Nothing -> return ()
-      Just id -> do
+      Just i  -> do
                    let newState = Seq.adjust' (\t@Todo{..} -> t{todoCompleted = not todoCompleted}) 
-                                              id 
-                                              state
+                                              i
+                                              nadaState
                    put (NadaState newState)
 appEvent _ = return ()
 
