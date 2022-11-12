@@ -39,6 +39,27 @@ packages:
       size: 428
   original:
     hackage: org-mode-2.0.2@sha256:2094c2a173aae097bf6500cb8f6499f710308ac715c37cdb88587a9065960b58,1452
+- completed:
+    hackage: fourmolu-0.9.0.0@sha256:0591609a168fe2839ebb2d02a2300626b6178a8924ea184e49eae4f571b27241,7732
+    pantry-tree:
+      sha256: 590fd16e5d7f4cf4aeab245187134589596679a6c70d667d014126c776227351
+      size: 146933
+  original:
+    hackage: fourmolu-0.9.0.0@sha256:0591609a168fe2839ebb2d02a2300626b6178a8924ea184e49eae4f571b27241,7732
+- completed:
+    hackage: Cabal-3.6.3.0@sha256:ff97c442b0c679c1c9876acd15f73ac4f602b973c45bde42b43ec28265ee48f4,12459
+    pantry-tree:
+      sha256: b250a53bdb56844f047a2927833bb565b936a289abfa85dfc2a63148d776368a
+      size: 19757
+  original:
+    hackage: Cabal-3.6.3.0@sha256:ff97c442b0c679c1c9876acd15f73ac4f602b973c45bde42b43ec28265ee48f4,12459
+- completed:
+    hackage: ghc-lib-parser-9.2.5.20221107@sha256:462cba52f8ad68c7de99e72e3d8e65bec41c8234de37dd68e0c676f3bac32888,12741
+    pantry-tree:
+      sha256: b93bcd1e384403568fc91a6bd15d840a6452f7d3833edde9d4777b897c9753a9
+      size: 27633
+  original:
+    hackage: ghc-lib-parser-9.2.5.20221107@sha256:462cba52f8ad68c7de99e72e3d8e65bec41c8234de37dd68e0c676f3bac32888,12741
 snapshots:
 - completed:
     sha256: ae630fb633086fb5128ec338a40a60c0f2b0a0f1bcfa9920c15855df2001338e
