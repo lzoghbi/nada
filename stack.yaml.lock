@@ -32,6 +32,13 @@ packages:
       size: 5394
   original:
     hackage: vty-5.37@sha256:416ba9007f6b64226ad68bfd7a227714082832d004e07567e9850a7cec67d77a,20859
+- completed:
+    hackage: org-mode-2.0.2@sha256:2094c2a173aae097bf6500cb8f6499f710308ac715c37cdb88587a9065960b58,1452
+    pantry-tree:
+      sha256: 3fcf949a55a88d3c0498822f9dd1921bcf6ab73e6c903fe7bb359cf7e0f4ffcc
+      size: 428
+  original:
+    hackage: org-mode-2.0.2@sha256:2094c2a173aae097bf6500cb8f6499f710308ac715c37cdb88587a9065960b58,1452
 snapshots:
 - completed:
     sha256: ae630fb633086fb5128ec338a40a60c0f2b0a0f1bcfa9920c15855df2001338e

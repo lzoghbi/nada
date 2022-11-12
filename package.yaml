@@ -41,6 +41,7 @@ library:
   - text
   - mtl
   - vty
+  - org-mode
 
 executables:
   nada:
@@ -53,6 +54,8 @@ executables:
     dependencies:
     - nada
     - brick
+    - text
+    - org-mode
 
 tests:
   nada-test:
