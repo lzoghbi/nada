@@ -27,12 +27,12 @@ orgFileToNada :: O.OrgFile -> NadaState
 -- FIXME: We ignore O.docBlocks entirely and silently ignore any failures to
 -- convert a section to a 'Todo' (represented as 'orgSectionToNadaTodo'
 -- returning 'Nothing').
-orgFileToNada org = NadaState . Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> O.docSections orgDoc
+orgFileToNada org = NadaState . Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [0..] (O.docSections orgDoc)
   where
     orgDoc = O.orgDoc org
 
-orgSectionToNadaTodo :: O.Section -> Maybe Todo
-orgSectionToNadaTodo O.Section{..} = do
+orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
+orgSectionToNadaTodo (todoId, O.Section{..}) = do
   -- FIXME: We return 'Nothing' if the 'Section' is missing 'sectionTodo'.
   --
   -- In the future we might consider it valid to have a section without a todo
@@ -55,9 +55,18 @@ orgSectionToNadaTodo O.Section{..} = do
     -- different.
     , todoDescription = description
     , todoCompleted = todo
-    -- FIXME: All 'Todo's have the same state right now. Should probably use
-    -- 'StateT' here.
-    , todoId = NadaId 1
+    -- FIXME: We don't keep track of the largest 'todoId' we encounter
+    -- throughout this creation process. If we want to add support for creating
+    -- new todos we will need to be able to generate "fresh" ids.
+    --
+    -- One hack to get around this is to assign the ids generated from reading
+    -- the org file negative values. Then we can just use positive values for
+    -- ids created while running the application.
+    --
+    -- The more natural thing to do would be to just return the largest id from
+    -- 'orgFileToNada'. Or eventually rework this function to make use of
+    -- our function to create a new todo (once implemented).
+    , todoId = NadaId todoId
     }
 
 findDescription :: O.OrgDoc -> Maybe Text
