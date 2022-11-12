@@ -36,9 +36,11 @@ ghc-options:
 library:
   source-dirs: src
   dependencies:
-  - brick
+  - brick >= 1.4
   - containers
   - text
+  - mtl
+  - vty
 
 executables:
   nada:

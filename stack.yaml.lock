@@ -3,7 +3,35 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: brick-1.4@sha256:c262e7a86a8ddcf962cad9e5744f79f98b0dce940ea569c308587a4b5e403a2d,17826
+    pantry-tree:
+      sha256: b7e0f7c4662ff89dcf97966de2f3da52e4dd3b51ebaeba045484a145fd71c9f0
+      size: 6687
+  original:
+    hackage: brick-1.4@sha256:c262e7a86a8ddcf962cad9e5744f79f98b0dce940ea569c308587a4b5e403a2d,17826
+- completed:
+    hackage: bimap-0.5.0@sha256:aba506d02a1c93fc2b50dcbe728d2a4d07cca89b7033945418061a0b08576ebd,1889
+    pantry-tree:
+      sha256: 285f5e86640f4bef3b7a60991defb8dd4b3714f8c294495d1136da182c1315a3
+      size: 470
+  original:
+    hackage: bimap-0.5.0@sha256:aba506d02a1c93fc2b50dcbe728d2a4d07cca89b7033945418061a0b08576ebd,1889
+- completed:
+    hackage: text-zipper-0.12@sha256:e96110598fc25e57a99ffcd8e583351af8b325b813aa5e3bd0adc627e3e02b6b,1472
+    pantry-tree:
+      sha256: 51edf26c8f66b1356c820b183e6442f8245ec2aef450fde4cd56db566347daa0
+      size: 604
+  original:
+    hackage: text-zipper-0.12@sha256:e96110598fc25e57a99ffcd8e583351af8b325b813aa5e3bd0adc627e3e02b6b,1472
+- completed:
+    hackage: vty-5.37@sha256:416ba9007f6b64226ad68bfd7a227714082832d004e07567e9850a7cec67d77a,20859
+    pantry-tree:
+      sha256: 75f72fc02ed2c9288b7957f2ff39e9b941fc41f83dff25aab4b9a540a47e6bdc
+      size: 5394
+  original:
+    hackage: vty-5.37@sha256:416ba9007f6b64226ad68bfd7a227714082832d004e07567e9850a7cec67d77a,20859
 snapshots:
 - completed:
     sha256: ae630fb633086fb5128ec338a40a60c0f2b0a0f1bcfa9920c15855df2001338e

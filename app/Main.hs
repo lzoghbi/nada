@@ -4,4 +4,4 @@ import Brick
 import Nada
 
 main :: IO ()
-main = simpleMain (nadaWidget)
+main = defaultMain nadaApp nadaDefaultState >> return ()
