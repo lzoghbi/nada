@@ -41,6 +41,7 @@ appEvent (MouseDown clickedId _ _ _) = do
                                               nadaState
                    put (NadaState newState)
 appEvent (VtyEvent vtyE) = case vtyE of
+  -- V.EvKey (V.KChar) [V.Modifiers] -> do sth
   V.EvKey (V.KChar 'c') [V.MCtrl] -> do 
     NadaState nadaState <- get
     halt
