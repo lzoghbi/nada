@@ -5,6 +5,7 @@ module Nada.Types
   , NadaId(..)
   , Todo(..)
   , testNadaState
+  , dummyTodo
   ) where
 
 import Data.Sequence (Seq(..))
@@ -21,6 +22,9 @@ data Todo = Todo
 newtype NadaState = NadaState (Seq Todo)
 newtype NadaId = NadaId Integer
   deriving (Eq, Ord, Show)
+
+dummyTodo :: (Seq Todo)
+dummyTodo = Seq.fromList $ []
 
 testNadaState :: NadaState
 testNadaState = NadaState $ Seq.fromList $ [todo1, todo2]
