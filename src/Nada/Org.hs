@@ -27,7 +27,8 @@ orgFileToNada :: O.OrgFile -> NadaState
 -- FIXME: We ignore O.docBlocks entirely and silently ignore any failures to
 -- convert a section to a 'Todo' (represented as 'orgSectionToNadaTodo'
 -- returning 'Nothing').
-orgFileToNada org = NadaState . Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [0..] (O.docSections orgDoc)
+-- Reserved 0 - 9 for other clickable widgets.
+orgFileToNada org = NadaState . Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
   where
     orgDoc = O.orgDoc org
 

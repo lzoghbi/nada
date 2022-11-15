@@ -5,6 +5,7 @@ module Nada.App
     ) where
 
 import Nada.Types
+import Data.Text (Text, pack)
 
 
 import Brick
@@ -24,7 +25,7 @@ shortcutInfoBar = T.Widget T.Fixed T.Fixed $ do
   let h = T.availHeight c
   T.render $ translateBy (T.Location (0, h-1)) 
     -- $ clickable (NadaId 0)
-    $ txt "[Ctrl-C] - Quit"
+    $ txt "[Ctrl-C] - Quit; [Ctrl-N] - Add new task; "
 
 
 -- [x] task 1
@@ -35,6 +36,7 @@ drawTodo Todo{..} =
   <+> txt todoName
   <=> drawDescription
   where
+    -- drawCompleted True = clickable todoId $ str ("[X]" ++ (show todoId))
     drawCompleted True = clickable todoId $ txt "[X]"
     drawCompleted False = clickable todoId $ txt "[ ]"
     drawDescription = padLeft (Pad 6) $ txt todoDescription
@@ -62,6 +64,17 @@ appEvent (VtyEvent vtyE) = case vtyE of
   V.EvKey (V.KChar 'c') [V.MCtrl] -> do 
     NadaState nadaState <- get
     halt
+  V.EvKey (V.KChar 'n') [V.MCtrl] -> do 
+    NadaState nadaState <- get
+    let newId = toInteger (10 + Seq.length nadaState)
+    let newTodo = Todo
+            { todoName = pack ("dummy " ++ show newId)
+            , todoDescription = pack ("dummy description " ++ show newId)
+            , todoCompleted = False
+            , todoId = NadaId newId
+            }
+    let newState = Seq.insertAt (Seq.length nadaState) newTodo nadaState
+    put (NadaState newState)
   _ -> return ()
 appEvent _ = return ()
 
