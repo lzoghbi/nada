@@ -6,6 +6,8 @@ module Nada.App
 
 import Nada.Types
 import Brick
+import Brick.Main
+import Brick.Types
 
 import Control.Monad.State
 import qualified Data.Sequence as Seq
@@ -38,6 +40,11 @@ appEvent (MouseDown clickedId _ _ _) = do
                                               i
                                               nadaState
                    put (NadaState newState)
+appEvent (VtyEvent vtyE) = case vtyE of
+  V.EvKey (V.KChar 'c') [V.MCtrl] -> do 
+    NadaState nadaState <- get
+    halt
+  _ -> return ()
 appEvent _ = return ()
 
 nadaApp :: App NadaState e NadaId
