@@ -11,6 +11,7 @@ import Brick.Types
 
 import Control.Monad.State
 import qualified Data.Sequence as Seq
+import qualified Data.Map as Map
 import Data.Foldable (toList)
 import qualified Graphics.Vty as V
 
@@ -21,6 +22,7 @@ drawTodo Todo{..} =
   padRight (Pad 1) (drawCompleted todoCompleted) 
   <+> txt todoName
   <=> drawDescription
+  -- <=> (padBottom (Pad 0) $ txt (Map.findWithDefault "shortcut" "*** MessageNotFound ***" messages))
   where
     drawCompleted True = clickable todoId $ txt "[X]"
     drawCompleted False = clickable todoId $ txt "[ ]"

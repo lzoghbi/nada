@@ -4,12 +4,14 @@ module Nada.Types
   ( NadaState(..)
   , NadaId(..)
   , Todo(..)
+  , messages
   , testNadaState
   , dummyTodo
   ) where
 
 import Data.Sequence (Seq(..))
 import qualified Data.Sequence as Seq
+import qualified Data.Map as Map
 import Data.Text (Text(..))
 
 data Todo = Todo 
@@ -22,6 +24,11 @@ data Todo = Todo
 newtype NadaState = NadaState (Seq Todo)
 newtype NadaId = NadaId Integer
   deriving (Eq, Ord, Show)
+
+messages :: (Map.Map Text Text)
+messages = Map.fromList 
+            [("shortcuts", "[Ctrl-C] - Quit"),
+              ("error", "Unexpected error occured.")]
 
 dummyTodo :: (Seq Todo)
 dummyTodo = Seq.fromList $ []
