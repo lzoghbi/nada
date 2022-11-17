@@ -14,6 +14,11 @@ Navigate to `nada` and build using `stack`.
 $ stack build
 ```
 
+For Mac M1 users,
+```bash
+$ C_INCLUDE_PATH="`xcrun --show-sdk-path`/usr/include/ffi" stack build
+```
+
 Execute using `stack`.
 
 ```bash

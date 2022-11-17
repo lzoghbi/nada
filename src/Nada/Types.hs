@@ -9,6 +9,7 @@ module Nada.Types
 
 import Data.Sequence (Seq(..))
 import qualified Data.Sequence as Seq
+import qualified Data.Map as Map
 import Data.Text (Text(..))
 
 data Todo = Todo 
@@ -29,11 +30,11 @@ testNadaState = NadaState $ Seq.fromList $ [todo1, todo2]
             { todoName = "test1"
             , todoDescription = "description 1"
             , todoCompleted = True
-            , todoId = NadaId 1
+            , todoId = NadaId 11
             }
   todo2 = Todo
             { todoName = "test2"
             , todoDescription = "description 2"
             , todoCompleted = False
-            , todoId = NadaId 2
+            , todoId = NadaId 12
             }
