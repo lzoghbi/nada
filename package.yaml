@@ -21,6 +21,15 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- brick >= 1.4
+- containers
+- text
+- mtl
+- vty
+- org-mode
+- microlens
+- microlens-mtl
+- microlens-th
 
 ghc-options:
 - -Wall
@@ -35,13 +44,6 @@ ghc-options:
 
 library:
   source-dirs: src
-  dependencies:
-  - brick >= 1.4
-  - containers
-  - text
-  - mtl
-  - vty
-  - org-mode
 
 executables:
   nada:
@@ -53,9 +55,6 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - nada
-    - brick
-    - text
-    - org-mode
 
 tests:
   nada-test:
