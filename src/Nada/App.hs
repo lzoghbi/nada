@@ -5,18 +5,15 @@ module Nada.App
     ) where
 
 import Nada.Types
-import Data.Text (Text, pack)
+import Data.Text (pack)
 
 
 import Brick
 import Brick.Main as M
-import Brick.Types
 import qualified Brick.Types as T
 
 import Control.Monad.State
 import qualified Data.Sequence as Seq
-import qualified Data.Map as Map
-import Data.Foldable (toList)
 import qualified Graphics.Vty as V
 import qualified Graphics.Vty.Input.Events as E
 
@@ -83,8 +80,8 @@ appEvent (MouseDown clickedId E.BLeft _ _) = do
                     put (currentState{todoList = newTodoList})
 
 -- Scroll for Task Viewport
-appEvent (MouseDown clickedId E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1   
-appEvent (MouseDown clickedId E.BScrollUp   _ _) = M.vScrollBy vp0Scroll (-1)
+appEvent (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1   
+appEvent (MouseDown _ E.BScrollUp   _ _) = M.vScrollBy vp0Scroll (-1)
 
 -- Keyboard Shortcuts
 appEvent (VtyEvent vtyE) = case vtyE of

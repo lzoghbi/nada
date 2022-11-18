@@ -9,8 +9,7 @@ module Nada.Types
 
 import Data.Sequence (Seq(..))
 import qualified Data.Sequence as Seq
-import qualified Data.Map as Map
-import Data.Text (Text(..))
+import Data.Text
 
 newtype NadaId = NadaId Integer
   deriving (Eq, Ord, Show)
