@@ -54,7 +54,7 @@ shortcutInfoBar = T.Widget T.Fixed T.Fixed $ do
   T.render 
     $ translateBy (T.Location (0, h-1)) 
     -- $ clickable (NadaId 0)
-    $ txt "[Ctrl-C] - Quit;  [Ctrl-N] - Add new task; "
+    $ txt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d]: Delete task  [t]: Toggle"
 
 -- Scroll functionality for Todo Viewport
 vp0Scroll :: M.ViewportScroll NadaId
@@ -78,18 +78,32 @@ appEvent (MouseDown clickedId E.BLeft _ _) = do
                                               i
                                               todoList
                     put (currentState{todoList = newTodoList})
-
 -- Scroll for Task Viewport
 appEvent (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1   
 appEvent (MouseDown _ E.BScrollUp   _ _) = M.vScrollBy vp0Scroll (-1)
-
 -- Keyboard Shortcuts
 appEvent (VtyEvent vtyE) = case vtyE of
+  V.EvKey (V.KChar 'q') [] -> do 
+                                _ <- get
+                                halt
+  V.EvKey (V.KChar 'j') [] -> do
+                          currentState@NadaState{..} <- get
+                          let nextSelected = min (selectedTodo + 1) (toInteger $ length todoList - 1)
+                          put $ currentState{selectedTodo = nextSelected}
+  V.EvKey (V.KChar 'k') [] -> do
+                        currentState@NadaState{..} <- get
+                        let nextSelected = max (selectedTodo - 1) 0
+                        put $ currentState{selectedTodo = nextSelected}
   -- V.EvKey (V.KChar) [V.Modifiers] -> do sth
-  V.EvKey (V.KChar 'c') [V.MCtrl] -> do 
-    _ <- get
-    halt
-  V.EvKey (V.KChar 'n') [V.MCtrl] -> do 
+  V.EvKey (V.KChar 'd') [] -> do
+                                currentState@NadaState{..} <- get
+                                let newTodoList = Seq.deleteAt (fromIntegral selectedTodo) todoList
+                                let newSelectedTodo = if selectedTodo /= 0 &&
+                                                         selectedTodo == toInteger (length todoList - 1)
+                                                      then selectedTodo - 1
+                                                      else selectedTodo
+                                put $ currentState{todoList = newTodoList, selectedTodo = newSelectedTodo}
+  V.EvKey (V.KChar 'n') [] -> do 
     currentState@NadaState{..} <- get
     let newId = toInteger (10 + Seq.length todoList)
     let newTodo = Todo
@@ -98,8 +112,16 @@ appEvent (VtyEvent vtyE) = case vtyE of
             , todoCompleted = False
             , todoId = NadaId newId
             }
+    let newSelectedTodo = toInteger $ length todoList
     let newTodoList = Seq.insertAt (Seq.length todoList) newTodo todoList
-    put (currentState{todoList = newTodoList})
+    put (currentState{todoList = newTodoList, selectedTodo = newSelectedTodo})
+  V.EvKey (V.KChar 't') [] -> do
+                                currentState@NadaState{..} <- get
+                                let currentTodo@Todo{..} = todoList `Seq.index` fromIntegral selectedTodo
+                                let newTodoList = Seq.update (fromIntegral selectedTodo)
+                                                             currentTodo{todoCompleted = not todoCompleted}
+                                                             todoList
+                                put (currentState{todoList = newTodoList})
   _ -> return ()
 appEvent _ = return ()
 
