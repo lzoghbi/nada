@@ -34,11 +34,9 @@ drawTodo Todo{..} =
 
 -- Widget - List of Todos
 drawTodos :: NadaState -> Widget NadaId
-drawTodos NadaState {..} =  T.Widget T.Fixed T.Fixed $ do
-  c <- T.getContext
-  let h = T.availHeight c
+drawTodos NadaState {..} =  T.Widget T.Greedy T.Greedy $ do
   T.render 
-    $ vLimit (h-2) $ viewport (NadaId 0) Vertical
+    $ viewport (NadaId 0) Vertical
     $ vBox $ do
                i <- [0..(length todoList - 1)] 
                let mkItem = if toInteger i == selectedTodo
@@ -48,13 +46,7 @@ drawTodos NadaState {..} =  T.Widget T.Fixed T.Fixed $ do
 
 -- Widget - Shortcut info
 shortcutInfoBar :: Widget NadaId
-shortcutInfoBar = T.Widget T.Fixed T.Fixed $ do
-  c <- T.getContext
-  let h = T.availHeight c
-  T.render 
-    $ translateBy (T.Location (0, h-1)) 
-    -- $ clickable (NadaId 0)
-    $ txt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d]: Delete task  [t]: Toggle"
+shortcutInfoBar = txt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d]: Delete task  [t]: Toggle"
 
 currentModeBar :: NadaState -> Widget NadaId
 currentModeBar NadaState{..} = str $ show mode
@@ -67,8 +59,8 @@ nadaAppDraw :: NadaState -> [Widget NadaId]
 nadaAppDraw st = [ui]
   where
     ui = vBox [drawTodos st 
-              ,shortcutInfoBar
               ,currentModeBar st
+              ,shortcutInfoBar
               ]
 
 appEventNormal :: BrickEvent NadaId e -> EventM NadaId NadaState ()
