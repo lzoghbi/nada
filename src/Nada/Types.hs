@@ -12,6 +12,9 @@ import qualified Data.Sequence as Seq
 import qualified Data.Map as Map
 import Data.Text (Text(..))
 
+newtype NadaId = NadaId Integer
+  deriving (Eq, Ord, Show)
+
 data Todo = Todo 
   { todoName :: Text
   , todoDescription :: Text
@@ -19,12 +22,15 @@ data Todo = Todo
   , todoId :: NadaId
   }
 
-newtype NadaState = NadaState (Seq Todo)
-newtype NadaId = NadaId Integer
-  deriving (Eq, Ord, Show)
+-- newtype NadaState = NadaState (Seq Todo)
+data NadaState = NadaState
+  { todoList :: Seq Todo
+  , selectedTodo :: Integer
+  }
 
 testNadaState :: NadaState
-testNadaState = NadaState $ Seq.fromList $ [todo1, todo2]
+testNadaState = NadaState { todoList = Seq.fromList $ [todo1, todo2]
+                          , selectedTodo = 0}
  where
   todo1 = Todo
             { todoName = "test1"

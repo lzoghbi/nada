@@ -28,9 +28,10 @@ orgFileToNada :: O.OrgFile -> NadaState
 -- convert a section to a 'Todo' (represented as 'orgSectionToNadaTodo'
 -- returning 'Nothing').
 -- Reserved 0 - 9 for other clickable widgets.
-orgFileToNada org = NadaState . Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
+orgFileToNada org = NadaState{selectedTodo = 0, ..}
   where
     orgDoc = O.orgDoc org
+    todoList = Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
 
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
 orgSectionToNadaTodo (todoId, O.Section{..}) = do
@@ -113,6 +114,6 @@ nadaTodoToOrgSection Todo{..} = O.Section
 
 nadaToOrgFile :: NadaState -> O.OrgFile
 -- FIXME: Eventually we will likely do more than just render sections.
-nadaToOrgFile (NadaState nadaState) = O.emptyOrgFile{O.orgDoc = O.emptyDoc{O.docSections = sections}}
+nadaToOrgFile (NadaState{..}) = O.emptyOrgFile{O.orgDoc = O.emptyDoc{O.docSections = sections}}
   where
-    sections = toList (nadaTodoToOrgSection <$> nadaState)
+    sections = toList (nadaTodoToOrgSection <$> todoList)
