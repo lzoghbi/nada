@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Nada.Types
   ( NadaState(..)
+  , NadaMode(..)
   , NadaId(..)
   , Todo(..)
   , testNadaState
@@ -14,6 +15,9 @@ import Data.Text
 newtype NadaId = NadaId Integer
   deriving (Eq, Ord, Show)
 
+data NadaMode = Normal | Edit
+  deriving (Eq, Show)
+
 data Todo = Todo 
   { todoName :: Text
   , todoDescription :: Text
@@ -25,11 +29,14 @@ data Todo = Todo
 data NadaState = NadaState
   { todoList :: Seq Todo
   , selectedTodo :: Integer
+  , mode :: NadaMode
   }
 
 testNadaState :: NadaState
 testNadaState = NadaState { todoList = Seq.fromList $ [todo1, todo2]
-                          , selectedTodo = 0}
+                          , selectedTodo = 0
+                          , mode = Normal
+                          }
  where
   todo1 = Todo
             { todoName = "test1"

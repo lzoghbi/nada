@@ -56,19 +56,24 @@ shortcutInfoBar = T.Widget T.Fixed T.Fixed $ do
     -- $ clickable (NadaId 0)
     $ txt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d]: Delete task  [t]: Toggle"
 
+currentModeBar :: NadaState -> Widget NadaId
+currentModeBar NadaState{..} = str $ show mode
+
 -- Scroll functionality for Todo Viewport
 vp0Scroll :: M.ViewportScroll NadaId
 vp0Scroll = M.viewportScroll (NadaId 0)
 
 nadaAppDraw :: NadaState -> [Widget NadaId]
-nadaAppDraw st =
-  [ drawTodos st
-  , shortcutInfoBar
-  ]
+nadaAppDraw st = [ui]
+  where
+    ui = vBox [drawTodos st 
+              ,shortcutInfoBar
+              ,currentModeBar st
+              ]
 
-appEvent :: BrickEvent NadaId e -> EventM NadaId NadaState ()
+appEventNormal :: BrickEvent NadaId e -> EventM NadaId NadaState ()
 -- Modify Tasks
-appEvent (MouseDown clickedId E.BLeft _ _) = do
+appEventNormal (MouseDown clickedId E.BLeft _ _) = do
     currentState@NadaState {..} <- get
     let todoIndex = Seq.findIndexL (\Todo{..} -> clickedId == todoId) todoList
     case todoIndex of
@@ -79,13 +84,16 @@ appEvent (MouseDown clickedId E.BLeft _ _) = do
                                               todoList
                     put (currentState{todoList = newTodoList})
 -- Scroll for Task Viewport
-appEvent (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1   
-appEvent (MouseDown _ E.BScrollUp   _ _) = M.vScrollBy vp0Scroll (-1)
+appEventNormal (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1   
+appEventNormal (MouseDown _ E.BScrollUp   _ _) = M.vScrollBy vp0Scroll (-1)
 -- Keyboard Shortcuts
-appEvent (VtyEvent vtyE) = case vtyE of
+appEventNormal (VtyEvent vtyE) = case vtyE of
   V.EvKey (V.KChar 'q') [] -> do 
                                 _ <- get
                                 halt
+  V.EvKey (V.KChar 'e') [] -> do
+                                st <- get
+                                put $ st {mode = Edit}
   V.EvKey (V.KChar 'j') [] -> do
                           currentState@NadaState{..} <- get
                           let nextSelected = min (selectedTodo + 1) (toInteger $ length todoList - 1)
@@ -123,7 +131,24 @@ appEvent (VtyEvent vtyE) = case vtyE of
                                                              todoList
                                 put (currentState{todoList = newTodoList})
   _ -> return ()
-appEvent _ = return ()
+appEventNormal _ = return ()
+
+appEventEdit :: BrickEvent NadaId e -> EventM NadaId NadaState ()
+appEventEdit (VtyEvent vtyE) = case vtyE of
+  V.EvKey V.KEsc [] -> do
+                         st <- get
+                         put $ st {mode = Normal}
+  _ -> return ()
+appEventEdit _ = return ()
+
+appEvent :: BrickEvent NadaId e -> EventM NadaId NadaState ()
+appEvent ev = do
+                NadaState {..} <- get
+                if mode == Normal
+                  then appEventNormal ev
+                else if mode == Edit
+                  then appEventEdit ev
+                else return ()
 
 selectedAttr :: AttrName
 selectedAttr = attrName "selected"
