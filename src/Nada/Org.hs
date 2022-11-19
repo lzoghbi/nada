@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 module Nada.Org
   ( -- * Reading
@@ -9,6 +10,7 @@ module Nada.Org
 import Nada.Types
 
 import Data.Foldable (find, toList)
+import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Org as O
@@ -46,10 +48,7 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
   -- type to 'Either ParseError Todo' and create a new 'ParseError' datatype
   -- representing a parse error.
   todo <- orgTodoToNadaCompleted <$> sectionTodo
-  -- FIXME: This is a hack to convert Data.Org's 'Words' into a 'Text'.
-  -- Eventually if we support rendering italics, underlines, etc. we should
-  -- convert this properly.
-  let name = foldMap O.prettyWords sectionHeading
+  let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
   pure $ Todo
     { todoName = name
@@ -79,7 +78,13 @@ findDescription O.OrgDoc{..} = do
   -- that the description. We ignore everything else the section contains.
   -- Presumably we will eventually care about rendering the rest of the section.
   O.Paragraph descWords <- find isParagraph docBlocks
-  pure $ foldMap O.prettyWords descWords
+  pure (orgWordsToText descWords)
+
+orgWordsToText :: NonEmpty O.Words -> Text
+-- FIXME: This is a hack to convert Data.Org's 'Words' into a 'Text'.
+-- Eventually if we support rendering italics, underlines, etc. we should
+-- convert this properly.
+orgWordsToText = T.intercalate " " . NE.toList . NE.map O.prettyWords
 
 isParagraph :: O.Block -> Bool
 isParagraph (O.Paragraph _) = True
