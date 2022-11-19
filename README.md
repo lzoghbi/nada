@@ -8,10 +8,10 @@ Clone this repository
 $ git clone https://github.com/lzoghbi/nada.git
 ```
 
-Navigate to `nada` and build using `stack`.
+Navigate to `nada` and build using `make`.
 
 ```bash
-$ stack build
+$ make
 ```
 
 For Mac M1 users,
@@ -24,6 +24,29 @@ Execute using `stack`.
 ```bash
 $ stack exec nada
 ```
+
+## Build commands
+
+We are using `stack` to build and execute the application and
+[`fourmolu`](https://github.com/fourmolu/fourmolu) to check and format source
+code.
+
+For convenience there are aliases provided in the Makefile.
+
+| Command       | Description                                                                                  |
+|---------------|----------------------------------------------------------------------------------------------|
+| `make`        | Alias for `make build format`.                                                               |
+| `make build`  | Builds the project.                                                                          |
+| `make lint`   | Runs the formatter in check mode. Reports any changes it would make, but does not make them. |
+| `make format` | Runs the formatter in inplace mode. Formats all source files in place.                       |
+| `make clean`  | Cleans the project.                                                                          |
+| `make test`   | Runs the tests.                                                                              |
+
+## Editor integration
+
+Follow [these
+instructions](https://github.com/fourmolu/fourmolu#editor-integration) to add
+`fourmolu` to your editor.
 
 ## Project description
 
