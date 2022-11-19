@@ -37,10 +37,12 @@ library
       base >=4.7 && <5
     , brick >=1.4
     , containers
+    , megaparsec
     , microlens
     , microlens-mtl
     , microlens-th
     , mtl
+    , optparse-applicative
     , org-mode
     , text
     , vty
@@ -57,11 +59,13 @@ executable nada
       base >=4.7 && <5
     , brick >=1.4
     , containers
+    , megaparsec
     , microlens
     , microlens-mtl
     , microlens-th
     , mtl
     , nada
+    , optparse-applicative
     , org-mode
     , text
     , vty
@@ -79,11 +83,13 @@ test-suite nada-test
       base >=4.7 && <5
     , brick >=1.4
     , containers
+    , megaparsec
     , microlens
     , microlens-mtl
     , microlens-th
     , mtl
     , nada
+    , optparse-applicative
     , org-mode
     , text
     , vty

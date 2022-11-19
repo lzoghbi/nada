@@ -30,6 +30,8 @@ dependencies:
 - microlens
 - microlens-mtl
 - microlens-th
+- optparse-applicative
+- megaparsec
 
 ghc-options:
 - -Wall

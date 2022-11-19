@@ -1,0 +1,12 @@
+
+
+* TODO Addproperstatetracking
+
+
+* DONE Add/editfilesviaCLI
+
+
+* TODO Runningnadawithoutanycommandshouldbethesameasrunningnadawiththecommandedit
+
+
+* TODO Fixbugwithspacesnotbeingaddedwhenwritingtooutput(LOL)
