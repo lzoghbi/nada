@@ -10,3 +10,6 @@
 
 
 * DONE Fix bug with spaces not being added when writing to output ( LOL)
+
+
+* TODO display warning when we don't completely read an input file
