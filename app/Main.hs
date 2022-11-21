@@ -3,7 +3,8 @@
 module Main (main) where
 
 import qualified Brick
-import Nada.Types (NadaState(..), Todo(..), NadaId(..))
+import qualified Brick.Widgets.Edit as Ed
+import Nada.Types (NadaState(..), Todo(..), Name(..))
 import Nada.App
 import Nada.Org
 import Data.Text (Text)
@@ -81,12 +82,13 @@ add :: FilePath -> Text -> Maybe Text -> IO ()
 add filePath todo todoDesc = do
   nadaState <- openNadaFile filePath
   -- FIXME: Write a helper function for this
+  let newIntId = toInteger $ Seq.length (todoList nadaState) + 1
   let newTodo = Todo
-              { todoName = todo
+              { todoName = Ed.editorText (EditorId newIntId) Nothing todo
               , todoDescription = fromMaybe "" todoDesc
               , todoCompleted = False
               -- FIXME: Use proper id generation
-              , todoId = NadaId . toInteger $ Seq.length (todoList nadaState) + 1
+              , todoId = TodoId newIntId
               }
       finalNadaState = nadaState{ todoList = todoList nadaState Seq.:|> newTodo }
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)

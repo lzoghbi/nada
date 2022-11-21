@@ -5,12 +5,13 @@ module Nada.App
     ) where
 
 import Nada.Types
-import Data.Text (pack)
+import Data.Text (pack, unlines)
 
 
 import Brick
 import Brick.Main as M
 import qualified Brick.Types as T
+import qualified Brick.Widgets.Edit as Ed
 
 import Control.Monad.State
 import qualified Data.Sequence as Seq
@@ -21,10 +22,10 @@ import qualified Graphics.Vty.Input.Events as E
 -- Widget - Single Todo
 -- [x] task 1
 --       description 1
-drawTodo :: Todo -> Widget NadaId
+drawTodo :: Todo -> Widget Name
 drawTodo Todo{..} = 
   padRight (Pad 1) (drawCompleted todoCompleted) 
-  <+> txt todoName
+  <+> txt ((Data.Text.unlines . Ed.getEditContents) todoName)
   <=> drawDescription
   where
     -- drawCompleted True = clickable todoId $ str ("[X]" ++ (show todoId))
@@ -33,10 +34,10 @@ drawTodo Todo{..} =
     drawDescription = padLeft (Pad 6) $ txt todoDescription
 
 -- Widget - List of Todos
-drawTodos :: NadaState -> Widget NadaId
+drawTodos :: NadaState -> Widget Name
 drawTodos NadaState {..} =  T.Widget T.Greedy T.Greedy $ do
   T.render 
-    $ viewport (NadaId 0) Vertical
+    $ viewport NadaVP Vertical
     $ vBox $ do
                i <- [0..(length todoList - 1)] 
                let mkItem = if toInteger i == selectedTodo
@@ -45,17 +46,17 @@ drawTodos NadaState {..} =  T.Widget T.Greedy T.Greedy $ do
                return $ mkItem $ drawTodo $ todoList `Seq.index` i
 
 -- Widget - Shortcut info
-shortcutInfoBar :: Widget NadaId
+shortcutInfoBar :: Widget Name
 shortcutInfoBar = txt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d]: Delete task  [t]: Toggle"
 
-currentModeBar :: NadaState -> Widget NadaId
+currentModeBar :: NadaState -> Widget Name
 currentModeBar NadaState{..} = str $ show mode
 
 -- Scroll functionality for Todo Viewport
-vp0Scroll :: M.ViewportScroll NadaId
-vp0Scroll = M.viewportScroll (NadaId 0)
+vp0Scroll :: M.ViewportScroll Name
+vp0Scroll = M.viewportScroll NadaVP
 
-nadaAppDraw :: NadaState -> [Widget NadaId]
+nadaAppDraw :: NadaState -> [Widget Name]
 nadaAppDraw st = [ui]
   where
     ui = vBox [drawTodos st 
@@ -63,7 +64,7 @@ nadaAppDraw st = [ui]
               ,shortcutInfoBar
               ]
 
-appEventNormal :: BrickEvent NadaId e -> EventM NadaId NadaState ()
+appEventNormal :: BrickEvent Name e -> EventM Name NadaState ()
 -- Modify Tasks
 appEventNormal (MouseDown clickedId E.BLeft _ _) = do
     currentState@NadaState {..} <- get
@@ -107,10 +108,10 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
     currentState@NadaState{..} <- get
     let newId = toInteger (10 + Seq.length todoList)
     let newTodo = Todo
-            { todoName = pack ("dummy " ++ show newId)
+            { todoName = Ed.editorText (EditorId newId) Nothing (pack $ "dummy " ++ show newId)
             , todoDescription = pack ("dummy description " ++ show newId)
             , todoCompleted = False
-            , todoId = NadaId newId
+            , todoId = TodoId newId
             }
     let newSelectedTodo = toInteger $ length todoList
     let newTodoList = Seq.insertAt (Seq.length todoList) newTodo todoList
@@ -125,7 +126,7 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
   _ -> return ()
 appEventNormal _ = return ()
 
-appEventEdit :: BrickEvent NadaId e -> EventM NadaId NadaState ()
+appEventEdit :: BrickEvent Name e -> EventM Name NadaState ()
 appEventEdit (VtyEvent vtyE) = case vtyE of
   V.EvKey V.KEsc [] -> do
                          st <- get
@@ -133,7 +134,7 @@ appEventEdit (VtyEvent vtyE) = case vtyE of
   _ -> return ()
 appEventEdit _ = return ()
 
-appEvent :: BrickEvent NadaId e -> EventM NadaId NadaState ()
+appEvent :: BrickEvent Name e -> EventM Name NadaState ()
 appEvent ev = do
                 NadaState {..} <- get
                 if mode == Normal
@@ -150,7 +151,7 @@ theMap = attrMap V.defAttr
     [ (selectedAttr, V.black `on` V.yellow)
     ]
 
-nadaApp :: App NadaState e NadaId
+nadaApp :: App NadaState e Name
 nadaApp = App
   { appDraw = nadaAppDraw
   , appChooseCursor = showFirstCursor

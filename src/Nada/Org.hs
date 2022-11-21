@@ -18,6 +18,8 @@ import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
 
+import Brick.Widgets.Edit as Ed
+
 -- | Converts an 'OrgFile' to a 'NadaState'
 --
 -- Nada files are a subset of valid org files. Right now we ignore anything that
@@ -51,7 +53,7 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
   let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
   pure $ Todo
-    { todoName = name
+    { todoName = Ed.editorText (EditorId todoId) Nothing name
     -- FIXME: We might want to change the 'Todo' datatype to have
     -- 'todoCompleted' be 'Maybe Text' instead of 'Text'. Right now we're
     -- converting the 'Nothing' case to the empty string, but they might be
@@ -69,7 +71,7 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
     -- The more natural thing to do would be to just return the largest id from
     -- 'orgFileToNada'. Or eventually rework this function to make use of
     -- our function to create a new todo (once implemented).
-    , todoId = NadaId todoId
+    , todoId = TodoId todoId
     }
 
 findDescription :: O.OrgDoc -> Maybe Text
@@ -108,7 +110,7 @@ nadaTodoToOrgSection Todo{..} = O.Section
   , sectionPriority = Nothing
   -- FIXME: Eventually we may wish to support more than plaintext todos. We
   -- might do this by changing the type of 'todoName' to 'Data.Org.Words'.
-  , sectionHeading = (NE.singleton (O.Plain todoName))
+  , sectionHeading = (NE.singleton (O.Plain $ (T.unlines . Ed.getEditContents) todoName))
   , sectionTags = []
   , sectionClosed = Nothing
   , sectionDeadline = Nothing

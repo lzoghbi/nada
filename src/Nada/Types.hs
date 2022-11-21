@@ -3,7 +3,7 @@
 module Nada.Types
   ( NadaState(..)
   , NadaMode(..)
-  , NadaId(..)
+  , Name(..)
   , Todo(..)
   , testNadaState
   ) where
@@ -11,18 +11,21 @@ module Nada.Types
 import Data.Sequence (Seq(..))
 import qualified Data.Sequence as Seq
 import Data.Text
+import qualified Brick.Widgets.Edit as Ed
 
-newtype NadaId = NadaId Integer
-  deriving (Eq, Ord, Show)
+data Name = TodoId Integer
+          | EditorId Integer
+          | NadaVP
+  deriving (Eq, Show, Ord)
 
 data NadaMode = Normal | Edit
   deriving (Eq, Show)
 
 data Todo = Todo 
-  { todoName :: Text
+  { todoName :: Ed.Editor Text Name
   , todoDescription :: Text
   , todoCompleted :: Bool
-  , todoId :: NadaId
+  , todoId :: Name
   }
 
 -- newtype NadaState = NadaState (Seq Todo)
@@ -39,14 +42,14 @@ testNadaState = NadaState { todoList = Seq.fromList $ [todo1, todo2]
                           }
  where
   todo1 = Todo
-            { todoName = "test1"
+            { todoName = Ed.editorText (EditorId 11) Nothing "test1"
             , todoDescription = "description 1"
             , todoCompleted = True
-            , todoId = NadaId 11
+            , todoId = TodoId 11
             }
   todo2 = Todo
-            { todoName = "test2"
+            { todoName = Ed.editorText (EditorId 12) Nothing "test2"
             , todoDescription = "description 2"
             , todoCompleted = False
-            , todoId = NadaId 12
+            , todoId = TodoId 12
             }
