@@ -35,9 +35,9 @@ orgFileToNada :: O.OrgFile -> NadaState
 orgFileToNada org = NadaState{..}
   where
     orgDoc = O.orgDoc org
-    todoList = Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
-    selectedTodo = 0
-    mode = Normal
+    _todoList = Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
+    _selectedTodo = 0
+    _mode = Normal
 
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
 orgSectionToNadaTodo (todoId, O.Section{..}) = do
@@ -53,13 +53,13 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
   let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
   pure $ Todo
-    { todoName = Ed.editorText (EditorId todoId) Nothing name
+    { _todoName = Ed.editorText (EditorId todoId) Nothing name
     -- FIXME: We might want to change the 'Todo' datatype to have
     -- 'todoCompleted' be 'Maybe Text' instead of 'Text'. Right now we're
     -- converting the 'Nothing' case to the empty string, but they might be
     -- different.
-    , todoDescription = description
-    , todoCompleted = todo
+    , _todoDescription = description
+    , _todoCompleted = todo
     -- FIXME: We don't keep track of the largest 'todoId' we encounter
     -- throughout this creation process. If we want to add support for creating
     -- new todos we will need to be able to generate "fresh" ids.
@@ -71,7 +71,7 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
     -- The more natural thing to do would be to just return the largest id from
     -- 'orgFileToNada'. Or eventually rework this function to make use of
     -- our function to create a new todo (once implemented).
-    , todoId = TodoId todoId
+    , _todoId = TodoId todoId
     }
 
 findDescription :: O.OrgDoc -> Maybe Text
@@ -106,11 +106,11 @@ orgTodoToNadaCompleted O.DONE = True
 -- we render the description as a paragraph of plaintext.
 nadaTodoToOrgSection :: Todo -> O.Section
 nadaTodoToOrgSection Todo{..} = O.Section
-  { sectionTodo = Just (nadaCompletedToOrgTodo todoCompleted)
+  { sectionTodo = Just (nadaCompletedToOrgTodo _todoCompleted)
   , sectionPriority = Nothing
   -- FIXME: Eventually we may wish to support more than plaintext todos. We
   -- might do this by changing the type of 'todoName' to 'Data.Org.Words'.
-  , sectionHeading = (NE.singleton (O.Plain $ (T.unlines . Ed.getEditContents) todoName))
+  , sectionHeading = (NE.singleton (O.Plain $ (T.unlines . Ed.getEditContents) _todoName))
   , sectionTags = []
   , sectionClosed = Nothing
   , sectionDeadline = Nothing
@@ -118,11 +118,11 @@ nadaTodoToOrgSection Todo{..} = O.Section
   , sectionTimestamp = Nothing
   , sectionProps = mempty
   -- FIXME: Eventually we will likely have a more complex section contents.
-  , sectionDoc = O.emptyDoc{O.docBlocks = [O.Paragraph $ NE.singleton (O.Plain todoDescription)]}
+  , sectionDoc = O.emptyDoc{O.docBlocks = [O.Paragraph $ NE.singleton (O.Plain _todoDescription)]}
   }
 
 nadaToOrgFile :: NadaState -> O.OrgFile
 -- FIXME: Eventually we will likely do more than just render sections.
 nadaToOrgFile (NadaState{..}) = O.emptyOrgFile{O.orgDoc = O.emptyDoc{O.docSections = sections}}
   where
-    sections = toList (nadaTodoToOrgSection <$> todoList)
+    sections = toList (nadaTodoToOrgSection <$> _todoList)

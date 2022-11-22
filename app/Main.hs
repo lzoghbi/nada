@@ -82,15 +82,15 @@ add :: FilePath -> Text -> Maybe Text -> IO ()
 add filePath todo todoDesc = do
   nadaState <- openNadaFile filePath
   -- FIXME: Write a helper function for this
-  let newIntId = toInteger $ Seq.length (todoList nadaState) + 1
+  let newIntId = toInteger $ Seq.length (_todoList nadaState) + 1
   let newTodo = Todo
-              { todoName = Ed.editorText (EditorId newIntId) Nothing todo
-              , todoDescription = fromMaybe "" todoDesc
-              , todoCompleted = False
+              { _todoName = Ed.editorText (EditorId newIntId) Nothing todo
+              , _todoDescription = fromMaybe "" todoDesc
+              , _todoCompleted = False
               -- FIXME: Use proper id generation
-              , todoId = TodoId newIntId
+              , _todoId = TodoId newIntId
               }
-      finalNadaState = nadaState{ todoList = todoList nadaState Seq.:|> newTodo }
+      finalNadaState = nadaState{ _todoList = _todoList nadaState Seq.:|> newTodo }
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 
