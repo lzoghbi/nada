@@ -30,7 +30,7 @@ drawTodo Todo{..} =
   <+> txt todoName
   <=> str dueDate 
   <=> drawDescription
-  <=> B.vBorder
+  <=> txt priority
   <=> B.hBorder
   where
     -- drawCompleted True = clickable todoId $ str ("[X]" ++ (show todoId))
