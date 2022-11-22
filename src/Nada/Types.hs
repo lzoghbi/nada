@@ -11,9 +11,13 @@ module Nada.Types
 import Data.Sequence (Seq(..))
 import qualified Data.Sequence as Seq
 import Data.Text
+import Data.Time (Day)
 
 newtype NadaId = NadaId Integer
   deriving (Eq, Ord, Show)
+
+newtype NadaPriority = NadaPriority Text
+   deriving (Eq, Ord, Show)
 
 data NadaMode = Normal | Edit
   deriving (Eq, Show)
@@ -23,6 +27,8 @@ data Todo = Todo
   , todoDescription :: Text
   , todoCompleted :: Bool
   , todoId :: NadaId
+  , todoDueDate :: Maybe Day
+  , todoPriority :: Maybe Text
   }
 
 -- newtype NadaState = NadaState (Seq Todo)

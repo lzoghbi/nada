@@ -11,11 +11,14 @@ import Data.Text (pack)
 import Brick
 import Brick.Main as M
 import qualified Brick.Types as T
+import qualified Brick.Widgets.Border as B
 
 import Control.Monad.State
 import qualified Data.Sequence as Seq
 import qualified Graphics.Vty as V
 import qualified Graphics.Vty.Input.Events as E
+import Data.Maybe (fromMaybe)
+import Data.Time (formatTime, defaultTimeLocale)
 
 
 -- Widget - Single Todo
@@ -25,12 +28,21 @@ drawTodo :: Todo -> Widget NadaId
 drawTodo Todo{..} = 
   padRight (Pad 1) (drawCompleted todoCompleted) 
   <+> txt todoName
+  <=> str dueDate 
   <=> drawDescription
+  <=> B.vBorder
+  <=> B.hBorder
   where
     -- drawCompleted True = clickable todoId $ str ("[X]" ++ (show todoId))
     drawCompleted True = clickable todoId $ txt "[X]"
     drawCompleted False = clickable todoId $ txt "[ ]"
     drawDescription = padLeft (Pad 6) $ txt todoDescription
+    dueDate = case todoDueDate of
+                Nothing -> ""
+                Just d  -> formatTime defaultTimeLocale "%Y-%d-%m" d
+    priority = case todoPriority of
+                Nothing -> ""
+                Just d  -> d
 
 -- Widget - List of Todos
 drawTodos :: NadaState -> Widget NadaId
@@ -111,6 +123,8 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
             , todoDescription = pack ("dummy description " ++ show newId)
             , todoCompleted = False
             , todoId = NadaId newId
+            , todoDueDate  = Nothing
+            , todoPriority = Nothing
             }
     let newSelectedTodo = toInteger $ length todoList
     let newTodoList = Seq.insertAt (Seq.length todoList) newTodo todoList

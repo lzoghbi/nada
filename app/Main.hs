@@ -6,7 +6,7 @@ import qualified Brick
 import Nada.Types (NadaState(..), Todo(..), NadaId(..))
 import Nada.App
 import Nada.Org
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import qualified Data.Text.IO as Text
 import qualified Data.Org as O
 import Options.Applicative
@@ -16,9 +16,10 @@ import qualified Data.Sequence as Seq
 import Data.Maybe (fromMaybe)
 -- For getting the error message when parsing the org file
 import Text.Megaparsec (parse, errorBundlePretty)
+import Data.Time (Day, parseTimeM, defaultTimeLocale)
 
 data Command
-  = Add Text (Maybe Text)
+  = Add Text (Maybe Text) (Maybe Text) (Maybe Text)
   | Edit
 
 commandParser :: Parser Command
@@ -33,10 +34,20 @@ commandParser = subparser
           <> help "Todo to add to the list"
           )
       <*> argument (Just <$> str)
+          (  metavar "DUE DATE"
+          <> value Nothing
+          <> help "(Optional) Due date for the todo"
+          )  
+      <*> argument (Just <$> str)
+          (  metavar "PRIORITY"
+          <> value Nothing
+          <> help "(Optional) Priority for the todo [high/medium/low]"
+          )      
+      <*> argument (Just <$> str)
           (  metavar "DESC"
           <> value Nothing
           <> help "(Optional) Description for the todo"
-          )
+          )             
       <**> helper
     editCommand = pure Edit <**> helper
 
@@ -77,8 +88,12 @@ edit filePath = do
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 
-add :: FilePath -> Text -> Maybe Text -> IO ()
-add filePath todo todoDesc = do
+todoDeadline :: Maybe Text -> Maybe Day
+todoDeadline (Just d) = parseTimeM True defaultTimeLocale "%Y-%-d-%-m" $ unpack d
+todoDeadline _        = Nothing
+
+add :: FilePath -> Text -> Maybe Text -> Maybe Text -> Maybe Text -> IO ()
+add filePath todo date todoPrio todoDesc = do
   nadaState <- openNadaFile filePath
   -- FIXME: Write a helper function for this
   let newTodo = Todo
@@ -87,6 +102,8 @@ add filePath todo todoDesc = do
               , todoCompleted = False
               -- FIXME: Use proper id generation
               , todoId = NadaId . toInteger $ Seq.length (todoList nadaState) + 1
+              , todoDueDate = todoDeadline date
+              , todoPriority = todoPrio
               }
       finalNadaState = nadaState{ todoList = todoList nadaState Seq.:|> newTodo }
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
@@ -103,4 +120,4 @@ main = do
       putStrLn "  nada --help"
       exitFailure
     (Just nadaFile, Edit) -> edit nadaFile
-    (Just nadaFile, Add todo todoDesc) -> add nadaFile todo todoDesc
+    (Just nadaFile, Add todo date todoPrio todoDesc) -> add nadaFile todo date todoPrio todoDesc 

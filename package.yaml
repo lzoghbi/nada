@@ -32,6 +32,7 @@ dependencies:
 - microlens-th
 - optparse-applicative
 - megaparsec
+- time
 
 ghc-options:
 - -Wall

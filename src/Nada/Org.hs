@@ -17,6 +17,7 @@ import qualified Data.Org as O
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Time (Day, dayOfWeek)
 
 -- | Converts an 'OrgFile' to a 'NadaState'
 --
@@ -50,6 +51,8 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
   todo <- orgTodoToNadaCompleted <$> sectionTodo
   let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
+      dueDate  = findDueDate sectionDeadline
+      priority = orgPrioToNadaPrio sectionPriority
   pure $ Todo
     { todoName = name
     -- FIXME: We might want to change the 'Todo' datatype to have
@@ -70,7 +73,13 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
     -- 'orgFileToNada'. Or eventually rework this function to make use of
     -- our function to create a new todo (once implemented).
     , todoId = NadaId todoId
+    , todoDueDate  = dueDate
+    , todoPriority = priority
     }
+  
+findDueDate :: Maybe O.OrgDateTime -> Maybe Day
+findDueDate (Just O.OrgDateTime{..}) = Just dateDay  
+findDueDate _ = Nothing
 
 findDescription :: O.OrgDoc -> Maybe Text
 findDescription O.OrgDoc{..} = do
@@ -84,7 +93,7 @@ orgWordsToText :: NonEmpty O.Words -> Text
 -- FIXME: This is a hack to convert Data.Org's 'Words' into a 'Text'.
 -- Eventually if we support rendering italics, underlines, etc. we should
 -- convert this properly.
-orgWordsToText = T.intercalate " " . NE.toList . NE.map O.prettyWords
+orgWordsToText = T.intercalate " " . NE.toList . NE.map O.prettyWords 
 
 isParagraph :: O.Block -> Bool
 isParagraph (O.Paragraph _) = True
@@ -98,6 +107,35 @@ orgTodoToNadaCompleted :: O.Todo -> Bool
 orgTodoToNadaCompleted O.TODO = False
 orgTodoToNadaCompleted O.DONE = True
 
+todoDeadline :: Maybe Day -> Maybe O.OrgDateTime
+todoDeadline (Just day) = Just ( O.OrgDateTime
+                               { O.dateDay = day
+                               , O.dateDayOfWeek = dayOfWeek day
+                               , O.dateTime = Nothing
+                               , O.dateRepeat = Nothing
+                               , O.dateDelay = Nothing
+                               })
+todoDeadline _          = Nothing
+
+-- data HIGH = "high" | "hi" | "h"
+--   deriving (Eq, Show)
+
+orgPrioToNadaPrio :: Maybe O.Priority -> Maybe Text
+orgPrioToNadaPrio (Just O.Priority{..}) = Just (case priority of
+                                                  "A" -> "high"
+                                                  "B" -> "medium"
+                                                  "C" -> "low"
+                                               )
+orgPrioToNadaPrio _                      = Nothing
+
+nadaPrioToOrgPrio :: Maybe Text -> Maybe O.Priority
+nadaPrioToOrgPrio (Just todoPrio) = Just (case todoPrio of
+                                            "high"   -> O.Priority { priority = "A" }
+                                            "medium" -> O.Priority { priority = "B" }
+                                            "low"    -> O.Priority { priority = "C" }
+                                          )
+nadaPrioToOrgPrio _               = Nothing
+
 -- | Represents a 'Todo' as a 'Section'
 --
 -- A 'Todo' always has a checkbox component and heading. Inside of the section
@@ -105,13 +143,13 @@ orgTodoToNadaCompleted O.DONE = True
 nadaTodoToOrgSection :: Todo -> O.Section
 nadaTodoToOrgSection Todo{..} = O.Section
   { sectionTodo = Just (nadaCompletedToOrgTodo todoCompleted)
-  , sectionPriority = Nothing
+  , sectionPriority = nadaPrioToOrgPrio todoPriority
   -- FIXME: Eventually we may wish to support more than plaintext todos. We
   -- might do this by changing the type of 'todoName' to 'Data.Org.Words'.
   , sectionHeading = (NE.singleton (O.Plain todoName))
   , sectionTags = []
   , sectionClosed = Nothing
-  , sectionDeadline = Nothing
+  , sectionDeadline = todoDeadline todoDueDate
   , sectionScheduled = Nothing
   , sectionTimestamp = Nothing
   , sectionProps = mempty
