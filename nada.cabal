@@ -41,7 +41,9 @@ library
     , containers
     , megaparsec
     , microlens
+    , microlens-ghc
     , microlens-mtl
+    , microlens-platform
     , microlens-th
     , mtl
     , optparse-applicative
@@ -65,7 +67,9 @@ executable nada
     , containers
     , megaparsec
     , microlens
+    , microlens-ghc
     , microlens-mtl
+    , microlens-platform
     , microlens-th
     , mtl
     , nada
@@ -91,7 +95,9 @@ test-suite nada-test
     , containers
     , megaparsec
     , microlens
+    , microlens-ghc
     , microlens-mtl
+    , microlens-platform
     , microlens-th
     , mtl
     , nada

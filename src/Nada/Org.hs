@@ -53,7 +53,7 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
   let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
   pure $ Todo
-    { _todoName = Ed.editorText (EditorId todoId) Nothing name
+    { _todoName = Ed.editorText (EditorId todoId) (Just 1) name
     -- FIXME: We might want to change the 'Todo' datatype to have
     -- 'todoCompleted' be 'Maybe Text' instead of 'Text'. Right now we're
     -- converting the 'Nothing' case to the empty string, but they might be

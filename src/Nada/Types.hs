@@ -1,19 +1,13 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Nada.Types
-  ( NadaState(..)
-  , NadaMode(..)
-  , Name(..)
-  , Todo(..)
-  , testNadaState
-  ) where
+module Nada.Types where
 
 import Data.Sequence (Seq(..))
 import qualified Data.Sequence as Seq
 import Data.Text
 import qualified Brick.Widgets.Edit as Ed
-import Lens.Micro.TH (makeLensesFor)
+import Lens.Micro.TH (makeLenses)
 
 data Name = TodoId Integer
           | EditorId Integer
@@ -29,14 +23,17 @@ data Todo = Todo
   , _todoCompleted :: Bool
   , _todoId :: Name
   }
-
--- makeLensesFor [("todoName", "_todoName")] ''Todo
+  deriving (Show)
 
 data NadaState = NadaState
   { _todoList :: Seq Todo
   , _selectedTodo :: Integer
   , _mode :: NadaMode
   }
+  deriving (Show)
+
+makeLenses ''Todo
+makeLenses ''NadaState
 
 testNadaState :: NadaState
 testNadaState = NadaState { _todoList = Seq.fromList $ [todo1, todo2]

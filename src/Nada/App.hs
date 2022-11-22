@@ -18,17 +18,20 @@ import qualified Data.Sequence as Seq
 import qualified Graphics.Vty as V
 import qualified Graphics.Vty.Input.Events as E
 
+import Lens.Micro
+import Lens.Micro.Mtl
+import Lens.Micro.Platform()
+
 
 -- Widget - Single Todo
 -- [x] task 1
 --       description 1
-drawTodo :: Todo -> Widget Name
-drawTodo Todo{..} = 
+drawTodo :: Todo -> Bool -> Widget Name
+drawTodo Todo{..} b = 
   padRight (Pad 1) (drawCompleted _todoCompleted) 
-  <+> txt ((Data.Text.unlines . Ed.getEditContents) _todoName)
+  <+> Ed.renderEditor (txt . Data.Text.unlines) b _todoName
   <=> drawDescription
   where
-    -- drawCompleted True = clickable todoId $ str ("[X]" ++ (show todoId))
     drawCompleted True = clickable _todoId $ txt "[X]"
     drawCompleted False = clickable _todoId $ txt "[ ]"
     drawDescription = padLeft (Pad 6) $ txt _todoDescription
@@ -39,11 +42,14 @@ drawTodos NadaState {..} =  T.Widget T.Greedy T.Greedy $ do
   T.render 
     $ viewport NadaVP Vertical
     $ vBox $ do
-               i <- [0..(length _todoList - 1)] 
-               let mkItem = if toInteger i == _selectedTodo
-                            then withAttr selectedAttr . visible
-                            else id
-               return $ mkItem $ drawTodo $ _todoList `Seq.index` i
+              i <- [0..(length _todoList - 1)] 
+              let isSelected = toInteger i == _selectedTodo
+              let isFocused = isSelected && (_mode == Edit)
+              let withStyle 
+                    | isFocused = forceAttr editingAttr . visible
+                    | isSelected = forceAttr selectedAttr . visible
+                    | otherwise = id
+              return $ withStyle $ drawTodo (_todoList `Seq.index` i) isFocused
 
 -- Widget - Shortcut info
 shortcutInfoBar :: Widget Name
@@ -95,7 +101,6 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
                         currentState@NadaState{..} <- get
                         let nextSelected = max (_selectedTodo - 1) 0
                         put $ currentState{_selectedTodo = nextSelected}
-  -- V.EvKey (V.KChar) [V.Modifiers] -> do sth
   V.EvKey (V.KChar 'd') [] -> do
                                 currentState@NadaState{..} <- get
                                 let newTodoList = Seq.deleteAt (fromIntegral _selectedTodo) _todoList
@@ -108,7 +113,7 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
     currentState@NadaState{..} <- get
     let newId = toInteger (10 + Seq.length _todoList)
     let newTodo = Todo
-            { _todoName = Ed.editorText (EditorId newId) Nothing (pack $ "dummy " ++ show newId)
+            { _todoName = Ed.editorText (EditorId newId) (Just 1) (pack $ "dummy " ++ show newId)
             , _todoDescription = pack ("dummy description " ++ show newId)
             , _todoCompleted = False
             , _todoId = TodoId newId
@@ -127,13 +132,13 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
 appEventNormal _ = return ()
 
 appEventEdit :: BrickEvent Name e -> EventM Name NadaState ()
-appEventEdit (VtyEvent vtyE) = case vtyE of
-  V.EvKey V.KEsc [] -> do
-                         st <- get
-                         put $ st {_mode = Normal}
-  _ -> return ()
--- appEventEdit ev = do
-appEventEdit _ = return ()
+appEventEdit ev = case ev of
+  (VtyEvent (V.EvKey V.KEsc [])) -> do
+    st <- get
+    put $ st {_mode = Normal}
+  _ -> do
+    idx <- use selectedTodo 
+    zoom (todoList.ix (fromIntegral idx).todoName) $ Ed.handleEditorEvent ev
 
 appEvent :: BrickEvent Name e -> EventM Name NadaState ()
 appEvent ev = do
@@ -144,12 +149,18 @@ appEvent ev = do
                   then appEventEdit ev
                 else return ()
 
+-- selectedAttr :: AttrName
 selectedAttr :: AttrName
 selectedAttr = attrName "selected"
+editingAttr :: AttrName
+editingAttr = attrName "editing"
 
 theMap :: AttrMap
 theMap = attrMap V.defAttr 
-    [ (selectedAttr, V.black `on` V.yellow)
+    [ (selectedAttr,                  V.black `on` V.yellow)
+    , (editingAttr,                   V.white `on` V.blue)
+    -- , (Ed.editAttr,                   V.white `on` V.blue)
+    -- , (Ed.editFocusedAttr,            V.black `on` V.yellow)
     ]
 
 nadaApp :: App NadaState e Name
