@@ -32,7 +32,7 @@ import Lens.Micro.Platform()
 --       description 1
 drawTodo :: Todo -> Bool -> Widget Name
 drawTodo Todo{..} b = 
-  (verticalB todoPriority) 
+  (verticalB _todoPriority) 
   <+>
   (padRight (Pad 1) (drawCompleted _todoCompleted) 
     <+> Ed.renderEditor (txt . Data.Text.unlines) b _todoName
@@ -44,7 +44,7 @@ drawTodo Todo{..} b =
     drawCompleted True  = clickable _todoId $ txt "[X]"
     drawCompleted False = clickable _todoId $ txt "[ ]"
     drawDescription = padLeft (Pad 6) $ txt _todoDescription
-    dueDate = case todoDueDate of
+    dueDate = case _todoDueDate of
                 Nothing -> ""
                 Just d  -> formatTime defaultTimeLocale "%Y-%d-%m" d
 
@@ -58,9 +58,6 @@ vborderMapping priority =
     red    = V.rgbColor 255 65 55
     green  = V.rgbColor 119 221 119
     orange = V.rgbColor 255 150 79
-    
-      
-      
 
 verticalB :: NadaPriority -> Widget Name
 verticalB priority = 
@@ -150,8 +147,8 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
             , _todoDescription = pack ("dummy description " ++ show newId)
             , _todoCompleted = False
             , _todoId = TodoId newId
-            , todoDueDate  = Nothing
-            , todoPriority = Medium
+            , _todoDueDate  = Nothing
+            , _todoPriority = Medium
             }
     let newSelectedTodo = toInteger $ length _todoList
     let newTodoList = Seq.insertAt (Seq.length _todoList) newTodo _todoList
@@ -192,8 +189,8 @@ editingAttr = attrName "editing"
 
 theMap :: AttrMap
 theMap = attrMap V.defAttr 
-    [ (selectedAttr,                  V.black `on` (V.rgbColor 253 253 150))
-    , (editingAttr,                   V.white `on` V.blue)
+    [ (selectedAttr, V.black `on` (V.rgbColor 253 253 150))
+    , (editingAttr,  V.white `on` V.blue)
     -- , (Ed.editAttr,                   V.white `on` V.blue)
     -- , (Ed.editFocusedAttr,            V.black `on` V.yellow)
     ]

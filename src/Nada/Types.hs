@@ -28,8 +28,8 @@ data Todo = Todo
   , _todoDescription :: Text
   , _todoCompleted :: Bool
   , _todoId :: Name
-  , todoDueDate :: Maybe Day
-  , todoPriority :: NadaPriority
+  , _todoDueDate :: Maybe Day
+  , _todoPriority :: NadaPriority
   }
   deriving (Show)
 

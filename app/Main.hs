@@ -111,8 +111,8 @@ add filePath todo date todoPrio todoDesc = do
               , _todoCompleted = False
               -- FIXME: Use proper id generation
               , _todoId = TodoId newIntId
-              , todoDueDate = toNadaDedline date
-              , todoPriority = toNadaPriority todoPrio
+              , _todoDueDate = toNadaDedline date
+              , _todoPriority = toNadaPriority todoPrio
               }
       finalNadaState = nadaState{ _todoList = _todoList nadaState Seq.:|> newTodo }
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)

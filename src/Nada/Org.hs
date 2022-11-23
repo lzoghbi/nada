@@ -77,8 +77,8 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
     -- 'orgFileToNada'. Or eventually rework this function to make use of
     -- our function to create a new todo (once implemented).
     , _todoId = TodoId todoId
-    , todoDueDate  = dueDate
-    , todoPriority = priority
+    , _todoDueDate  = dueDate
+    , _todoPriority = priority
     }
 
 findDueDate :: Maybe O.OrgDateTime -> Maybe Day
@@ -113,12 +113,12 @@ orgTodoToNadaCompleted O.DONE = True
 
 todoDeadline :: Maybe Day -> Maybe O.OrgDateTime
 todoDeadline (Just day) = Just ( O.OrgDateTime
-                               { O.dateDay = day
-                               , O.dateDayOfWeek = dayOfWeek day
-                               , O.dateTime = Nothing
-                               , O.dateRepeat = Nothing
-                               , O.dateDelay = Nothing
-                               })
+  { O.dateDay = day
+  , O.dateDayOfWeek = dayOfWeek day
+  , O.dateTime = Nothing
+  , O.dateRepeat = Nothing
+  , O.dateDelay = Nothing
+  })
 todoDeadline _          = Nothing
 
 orgPrioToNadaPrio :: Maybe O.Priority -> NadaPriority
@@ -141,13 +141,13 @@ nadaPrioToOrgPrio todoPrio = case todoPrio of
 nadaTodoToOrgSection :: Todo -> O.Section
 nadaTodoToOrgSection Todo{..} = O.Section
   { sectionTodo = Just (nadaCompletedToOrgTodo _todoCompleted)
-  , sectionPriority = Just (nadaPrioToOrgPrio todoPriority)
+  , sectionPriority = Just (nadaPrioToOrgPrio _todoPriority)
   -- FIXME: Eventually we may wish to support more than plaintext todos. We
   -- might do this by changing the type of 'todoName' to 'Data.Org.Words'.
   , sectionHeading = (NE.singleton (O.Plain $ (T.unlines . Ed.getEditContents) _todoName))
   , sectionTags = []
   , sectionClosed = Nothing
-  , sectionDeadline = todoDeadline todoDueDate
+  , sectionDeadline = todoDeadline _todoDueDate
   , sectionScheduled = Nothing
   , sectionTimestamp = Nothing
   , sectionProps = mempty
