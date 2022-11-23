@@ -55,9 +55,10 @@ vborderMapping priority =
     Medium -> [(B.vBorderAttr, orange `on` orange)]
     Low    -> [(B.vBorderAttr, green `on` green)]
   where 
-  red = V.rgbColor 255 65 55
-  orange = V.rgbColor 255 150 79
-  green = V.rgbColor 119 221 119
+    red    = V.rgbColor 255 65 55
+    green  = V.rgbColor 119 221 119
+    orange = V.rgbColor 255 150 79
+    
       
       
 
@@ -191,7 +192,7 @@ editingAttr = attrName "editing"
 
 theMap :: AttrMap
 theMap = attrMap V.defAttr 
-    [ (selectedAttr,                  V.black `on` V.white)
+    [ (selectedAttr,                  V.black `on` (V.rgbColor 253 253 150))
     , (editingAttr,                   V.white `on` V.blue)
     -- , (Ed.editAttr,                   V.white `on` V.blue)
     -- , (Ed.editFocusedAttr,            V.black `on` V.yellow)
