@@ -19,6 +19,10 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (Day, dayOfWeek)
 
+import Brick.Widgets.Edit as Ed
+
+import Brick.Widgets.Edit as Ed
+
 -- | Converts an 'OrgFile' to a 'NadaState'
 --
 -- Nada files are a subset of valid org files. Right now we ignore anything that
@@ -34,9 +38,9 @@ orgFileToNada :: O.OrgFile -> NadaState
 orgFileToNada org = NadaState{..}
   where
     orgDoc = O.orgDoc org
-    todoList = Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
-    selectedTodo = 0
-    mode = Normal
+    _todoList = Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
+    _selectedTodo = 0
+    _mode = Normal
 
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
 orgSectionToNadaTodo (todoId, O.Section{..}) = do
@@ -54,13 +58,13 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
       dueDate  = findDueDate sectionDeadline
       priority = orgPrioToNadaPrio sectionPriority
   pure $ Todo
-    { todoName = name
+    { _todoName = Ed.editorText (EditorId todoId) (Just 1) name
     -- FIXME: We might want to change the 'Todo' datatype to have
     -- 'todoCompleted' be 'Maybe Text' instead of 'Text'. Right now we're
     -- converting the 'Nothing' case to the empty string, but they might be
     -- different.
-    , todoDescription = description
-    , todoCompleted = todo
+    , _todoDescription = description
+    , _todoCompleted = todo
     -- FIXME: We don't keep track of the largest 'todoId' we encounter
     -- throughout this creation process. If we want to add support for creating
     -- new todos we will need to be able to generate "fresh" ids.
@@ -72,11 +76,11 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
     -- The more natural thing to do would be to just return the largest id from
     -- 'orgFileToNada'. Or eventually rework this function to make use of
     -- our function to create a new todo (once implemented).
-    , todoId = NadaId todoId
+    , _todoId = TodoId todoId
     , todoDueDate  = dueDate
     , todoPriority = priority
     }
-  
+
 findDueDate :: Maybe O.OrgDateTime -> Maybe Day
 findDueDate (Just O.OrgDateTime{..}) = Just dateDay  
 findDueDate _ = Nothing
@@ -117,24 +121,18 @@ todoDeadline (Just day) = Just ( O.OrgDateTime
                                })
 todoDeadline _          = Nothing
 
--- data HIGH = "high" | "hi" | "h"
---   deriving (Eq, Show)
+orgPrioToNadaPrio :: Maybe O.Priority -> NadaPriority
+orgPrioToNadaPrio (Just O.Priority{..}) = case priority of
+                                            "A" -> High
+                                            "B" -> Medium
+                                            "C" -> Low
+orgPrioToNadaPrio _                     = Medium
 
-orgPrioToNadaPrio :: Maybe O.Priority -> Maybe Text
-orgPrioToNadaPrio (Just O.Priority{..}) = Just (case priority of
-                                                  "A" -> "high"
-                                                  "B" -> "medium"
-                                                  "C" -> "low"
-                                               )
-orgPrioToNadaPrio _                      = Nothing
-
-nadaPrioToOrgPrio :: Maybe Text -> Maybe O.Priority
-nadaPrioToOrgPrio (Just todoPrio) = Just (case todoPrio of
-                                            "high"   -> O.Priority { priority = "A" }
-                                            "medium" -> O.Priority { priority = "B" }
-                                            "low"    -> O.Priority { priority = "C" }
-                                          )
-nadaPrioToOrgPrio _               = Nothing
+nadaPrioToOrgPrio :: NadaPriority -> O.Priority
+nadaPrioToOrgPrio todoPrio = case todoPrio of
+                               High   -> O.Priority { priority = "A" }
+                               Medium -> O.Priority { priority = "B" }
+                               Low    -> O.Priority { priority = "C" }
 
 -- | Represents a 'Todo' as a 'Section'
 --
@@ -142,11 +140,11 @@ nadaPrioToOrgPrio _               = Nothing
 -- we render the description as a paragraph of plaintext.
 nadaTodoToOrgSection :: Todo -> O.Section
 nadaTodoToOrgSection Todo{..} = O.Section
-  { sectionTodo = Just (nadaCompletedToOrgTodo todoCompleted)
-  , sectionPriority = nadaPrioToOrgPrio todoPriority
+  { sectionTodo = Just (nadaCompletedToOrgTodo _todoCompleted)
+  , sectionPriority = Just (nadaPrioToOrgPrio todoPriority)
   -- FIXME: Eventually we may wish to support more than plaintext todos. We
   -- might do this by changing the type of 'todoName' to 'Data.Org.Words'.
-  , sectionHeading = (NE.singleton (O.Plain todoName))
+  , sectionHeading = (NE.singleton (O.Plain $ (T.unlines . Ed.getEditContents) _todoName))
   , sectionTags = []
   , sectionClosed = Nothing
   , sectionDeadline = todoDeadline todoDueDate
@@ -154,11 +152,11 @@ nadaTodoToOrgSection Todo{..} = O.Section
   , sectionTimestamp = Nothing
   , sectionProps = mempty
   -- FIXME: Eventually we will likely have a more complex section contents.
-  , sectionDoc = O.emptyDoc{O.docBlocks = [O.Paragraph $ NE.singleton (O.Plain todoDescription)]}
+  , sectionDoc = O.emptyDoc{O.docBlocks = [O.Paragraph $ NE.singleton (O.Plain _todoDescription)]}
   }
 
 nadaToOrgFile :: NadaState -> O.OrgFile
 -- FIXME: Eventually we will likely do more than just render sections.
 nadaToOrgFile (NadaState{..}) = O.emptyOrgFile{O.orgDoc = O.emptyDoc{O.docSections = sections}}
   where
-    sections = toList (nadaTodoToOrgSection <$> todoList)
+    sections = toList (nadaTodoToOrgSection <$> _todoList)

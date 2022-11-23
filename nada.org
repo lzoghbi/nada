@@ -1,15 +1,33 @@
 
 
-* TODO Add proper state tracking
+* TODO [#B] Add proper state tracking
 
 
-* DONE Add/edit files via CLI
+
+* DONE [#B] Add/edit files via CLI
 
 
-* TODO Running nada without any command should be the same as running nada with the command edit
+
+* TODO [#B] Running nada without any command should be the same as running nada with the command edit
 
 
-* DONE Fix bug with spaces not being added when writing to output ( LOL)
+
+* DONE [#B] Fix bug with spaces not being added when writing to output ( LOL)
 
 
-* TODO display warning when we don't completely read an input file
+
+* TODO [#B] display warning when we don't completely read an input file
+
+
+
+* TODO [#C] testTodo10
+
+DEADLINE: <2022-01-01 Sat>
+
+* TODO [#A] testTodo12
+
+DEADLINE: <2022-01-01 Sat>
+
+* TODO [#A] testTodo12
+
+  DEADLINE: <2022-01-01 Sat>

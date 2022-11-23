@@ -30,6 +30,8 @@ dependencies:
 - microlens
 - microlens-mtl
 - microlens-th
+- microlens-ghc
+- microlens-platform
 - optparse-applicative
 - megaparsec
 - time

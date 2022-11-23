@@ -3,7 +3,8 @@
 module Main (main) where
 
 import qualified Brick
-import Nada.Types (NadaState(..), Todo(..), NadaId(..))
+import qualified Brick.Widgets.Edit as Ed
+import Nada.Types (NadaState(..), Todo(..), Name(..), NadaPriority(..))
 import Nada.App
 import Nada.Org
 import Data.Text (Text, unpack)
@@ -88,24 +89,32 @@ edit filePath = do
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 
-todoDeadline :: Maybe Text -> Maybe Day
-todoDeadline (Just d) = parseTimeM True defaultTimeLocale "%Y-%-d-%-m" $ unpack d
-todoDeadline _        = Nothing
+toNadaDedline :: Maybe Text -> Maybe Day
+toNadaDedline (Just d) = parseTimeM True defaultTimeLocale "%Y-%-d-%-m" $ unpack d
+toNadaDedline _        = Nothing
+
+toNadaPriority :: Maybe Text -> NadaPriority
+toNadaPriority (Just p) = case p of
+                            "high"   -> High
+                            "medium" -> Medium
+                            "low"    -> Low
+toNadaPriority _        = Medium
 
 add :: FilePath -> Text -> Maybe Text -> Maybe Text -> Maybe Text -> IO ()
 add filePath todo date todoPrio todoDesc = do
   nadaState <- openNadaFile filePath
   -- FIXME: Write a helper function for this
+  let newIntId = toInteger $ Seq.length (_todoList nadaState) + 1
   let newTodo = Todo
-              { todoName = todo
-              , todoDescription = fromMaybe "" todoDesc
-              , todoCompleted = False
+              { _todoName = Ed.editorText (EditorId newIntId) Nothing todo
+              , _todoDescription = fromMaybe "" todoDesc
+              , _todoCompleted = False
               -- FIXME: Use proper id generation
-              , todoId = NadaId . toInteger $ Seq.length (todoList nadaState) + 1
-              , todoDueDate = todoDeadline date
-              , todoPriority = todoPrio
+              , _todoId = TodoId newIntId
+              , todoDueDate = toNadaDedline date
+              , todoPriority = toNadaPriority todoPrio
               }
-      finalNadaState = nadaState{ todoList = todoList nadaState Seq.:|> newTodo }
+      finalNadaState = nadaState{ _todoList = _todoList nadaState Seq.:|> newTodo }
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 
