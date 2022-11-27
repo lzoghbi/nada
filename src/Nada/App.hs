@@ -39,7 +39,7 @@ drawTodo Todo{..} b =
     <=> str dueDate 
     <=> drawDescription
   )
-  <=> B.hBorder       
+  <=> B.hBorder 
   where
     drawCompleted True  = clickable _todoId $ txt "[X]"
     drawCompleted False = clickable _todoId $ txt "[ ]"
@@ -70,6 +70,9 @@ verticalB priority =
 drawTodos :: NadaState -> Widget Name
 drawTodos NadaState {..} =  T.Widget T.Greedy T.Greedy $ do
   T.render 
+    $
+    B.borderWithLabel (str "All tasks") $
+    vLimit 50  
     $ viewport NadaVP Vertical
     $ vBox $ do
               i <- [0..(length _todoList - 1)] 

@@ -89,9 +89,11 @@ edit filePath = do
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 
-toNadaDedline :: Maybe Text -> Maybe Day
-toNadaDedline (Just d) = parseTimeM True defaultTimeLocale "%Y-%-d-%-m" $ unpack d
-toNadaDedline _        = Nothing
+toNadaDeadline :: Maybe Text -> Maybe Day
+-- TODO: error handling when input is wrong - currently it returns `Nothing`
+-- Dates need to have 2 digits for days/months
+toNadaDeadline (Just d) = parseTimeM True defaultTimeLocale "%Y-%-d-%-m" $ unpack d
+toNadaDeadline _        = Nothing
 
 toNadaPriority :: Maybe Text -> NadaPriority
 toNadaPriority (Just p) = case p of
@@ -105,16 +107,16 @@ add filePath todo date todoPrio todoDesc = do
   nadaState <- openNadaFile filePath
   -- FIXME: Write a helper function for this
   let newIntId = toInteger $ Seq.length (_todoList nadaState) + 1
-  let newTodo = Todo
+  let newTodo = Todo 
               { _todoName = Ed.editorText (EditorId newIntId) Nothing todo
               , _todoDescription = fromMaybe "" todoDesc
               , _todoCompleted = False
               -- FIXME: Use proper id generation
               , _todoId = TodoId newIntId
-              , _todoDueDate = toNadaDedline date
+              , _todoDueDate = toNadaDeadline date
               , _todoPriority = toNadaPriority todoPrio
-              }
-      finalNadaState = nadaState{ _todoList = _todoList nadaState Seq.:|> newTodo }
+              }            
+      finalNadaState = nadaState{ _todoList = _todoList nadaState Seq.:|> newTodo } 
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 

@@ -21,8 +21,6 @@ import Data.Time (Day, dayOfWeek)
 
 import Brick.Widgets.Edit as Ed
 
-import Brick.Widgets.Edit as Ed
-
 -- | Converts an 'OrgFile' to a 'NadaState'
 --
 -- Nada files are a subset of valid org files. Right now we ignore anything that
@@ -40,8 +38,8 @@ orgFileToNada org = NadaState{..}
     orgDoc = O.orgDoc org
     _todoList = Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
     _selectedTodo = 0
-    _mode = Normal
-
+    _mode = Normal  
+    
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
 orgSectionToNadaTodo (todoId, O.Section{..}) = do
   -- FIXME: We return 'Nothing' if the 'Section' is missing 'sectionTodo'.
@@ -51,12 +49,12 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
   --
   -- Even if we demand that each section have a todo, we could change the return
   -- type to 'Either ParseError Todo' and create a new 'ParseError' datatype
-  -- representing a parse error.
+  -- representing a parse error.  
   todo <- orgTodoToNadaCompleted <$> sectionTodo
   let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
       dueDate  = findDueDate sectionDeadline
-      priority = orgPrioToNadaPrio sectionPriority
+      priority = orgPrioToNadaPrio sectionPriority      
   pure $ Todo
     { _todoName = Ed.editorText (EditorId todoId) (Just 1) name
     -- FIXME: We might want to change the 'Todo' datatype to have
@@ -119,7 +117,7 @@ todoDeadline (Just day) = Just ( O.OrgDateTime
   , O.dateRepeat = Nothing
   , O.dateDelay = Nothing
   })
-todoDeadline _          = Nothing
+todoDeadline _ = Nothing
 
 orgPrioToNadaPrio :: Maybe O.Priority -> NadaPriority
 orgPrioToNadaPrio (Just O.Priority{..}) = case priority of
@@ -129,10 +127,9 @@ orgPrioToNadaPrio (Just O.Priority{..}) = case priority of
 orgPrioToNadaPrio _                     = Medium
 
 nadaPrioToOrgPrio :: NadaPriority -> O.Priority
-nadaPrioToOrgPrio todoPrio = case todoPrio of
-                               High   -> O.Priority { priority = "A" }
-                               Medium -> O.Priority { priority = "B" }
-                               Low    -> O.Priority { priority = "C" }
+nadaPrioToOrgPrio High   = O.Priority { priority = "A" }
+nadaPrioToOrgPrio Medium = O.Priority { priority = "B" }
+nadaPrioToOrgPrio Low    = O.Priority { priority = "C" }
 
 -- | Represents a 'Todo' as a 'Section'
 --
@@ -144,7 +141,10 @@ nadaTodoToOrgSection Todo{..} = O.Section
   , sectionPriority = Just (nadaPrioToOrgPrio _todoPriority)
   -- FIXME: Eventually we may wish to support more than plaintext todos. We
   -- might do this by changing the type of 'todoName' to 'Data.Org.Words'.
-  , sectionHeading = (NE.singleton (O.Plain $ (T.unlines . Ed.getEditContents) _todoName))
+  -- Use `unwords` instead of `unlines`, because the latter adds a new line and 
+  -- which leads to errors in the section fields below (everythng after a new line
+  -- is parsed as sectionDoc)
+  , sectionHeading = (NE.singleton (O.Plain $ (T.unwords . Ed.getEditContents) _todoName))
   , sectionTags = []
   , sectionClosed = Nothing
   , sectionDeadline = todoDeadline _todoDueDate

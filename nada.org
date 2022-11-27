@@ -3,31 +3,17 @@
 * TODO [#B] Add proper state tracking
 
 
-
 * DONE [#B] Add/edit files via CLI
-
 
 
 * TODO [#B] Running nada without any command should be the same as running nada with the command edit
 
 
-
 * DONE [#B] Fix bug with spaces not being added when writing to output ( LOL)
-
 
 
 * TODO [#B] display warning when we don't completely read an input file
 
 
-
-* TODO [#C] testTodo10
-
-DEADLINE: <2022-01-01 Sat>
-
-* TODO [#A] testTodo12
-
-DEADLINE: <2022-01-01 Sat>
-
-* TODO [#A] testTodo12
-
-  DEADLINE: <2022-01-01 Sat>
+* TODO [#C] newTask7
+  DEADLINE: <2022-12-31 Sat>
