@@ -17,6 +17,9 @@ import qualified Data.Org as O
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Time (Day, dayOfWeek)
+
+import Brick.Widgets.Edit as Ed
 
 import Brick.Widgets.Edit as Ed
 
@@ -37,8 +40,8 @@ orgFileToNada org = NadaState{..}
     orgDoc = O.orgDoc org
     _todoList = Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
     _selectedTodo = 0
-    _mode = Normal
-
+    _mode = Normal  
+    
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
 orgSectionToNadaTodo (todoId, O.Section{..}) = do
   -- FIXME: We return 'Nothing' if the 'Section' is missing 'sectionTodo'.
@@ -48,10 +51,12 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
   --
   -- Even if we demand that each section have a todo, we could change the return
   -- type to 'Either ParseError Todo' and create a new 'ParseError' datatype
-  -- representing a parse error.
+  -- representing a parse error.  
   todo <- orgTodoToNadaCompleted <$> sectionTodo
   let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
+      dueDate  = findDueDate sectionDeadline
+      priority = orgPrioToNadaPrio sectionPriority      
   pure $ Todo
     { _todoName = Ed.editorText (EditorId todoId) (Just 1) name
     -- FIXME: We might want to change the 'Todo' datatype to have
@@ -72,7 +77,14 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
     -- 'orgFileToNada'. Or eventually rework this function to make use of
     -- our function to create a new todo (once implemented).
     , _todoId = TodoId todoId
+    , _todoDueDate  = dueDate
+    , _todoPriority = priority
+    , _todoTags = sectionTags
     }
+
+findDueDate :: Maybe O.OrgDateTime -> Maybe Day
+findDueDate (Just O.OrgDateTime{..}) = Just dateDay  
+findDueDate _ = Nothing
 
 findDescription :: O.OrgDoc -> Maybe Text
 findDescription O.OrgDoc{..} = do
@@ -86,7 +98,7 @@ orgWordsToText :: NonEmpty O.Words -> Text
 -- FIXME: This is a hack to convert Data.Org's 'Words' into a 'Text'.
 -- Eventually if we support rendering italics, underlines, etc. we should
 -- convert this properly.
-orgWordsToText = T.intercalate " " . NE.toList . NE.map O.prettyWords
+orgWordsToText = T.intercalate " " . NE.toList . NE.map O.prettyWords 
 
 isParagraph :: O.Block -> Bool
 isParagraph (O.Paragraph _) = True
@@ -100,6 +112,28 @@ orgTodoToNadaCompleted :: O.Todo -> Bool
 orgTodoToNadaCompleted O.TODO = False
 orgTodoToNadaCompleted O.DONE = True
 
+todoDeadline :: Maybe Day -> Maybe O.OrgDateTime
+todoDeadline (Just day) = Just ( O.OrgDateTime
+  { O.dateDay = day
+  , O.dateDayOfWeek = dayOfWeek day
+  , O.dateTime = Nothing
+  , O.dateRepeat = Nothing
+  , O.dateDelay = Nothing
+  })
+todoDeadline _ = Nothing
+
+orgPrioToNadaPrio :: Maybe O.Priority -> NadaPriority
+orgPrioToNadaPrio (Just O.Priority{..}) = case priority of
+                                            "A" -> High
+                                            "B" -> Medium
+                                            "C" -> Low
+orgPrioToNadaPrio _                     = Medium
+
+nadaPrioToOrgPrio :: NadaPriority -> O.Priority
+nadaPrioToOrgPrio High   = O.Priority { priority = "A" }
+nadaPrioToOrgPrio Medium = O.Priority { priority = "B" }
+nadaPrioToOrgPrio Low    = O.Priority { priority = "C" }
+
 -- | Represents a 'Todo' as a 'Section'
 --
 -- A 'Todo' always has a checkbox component and heading. Inside of the section
@@ -107,13 +141,16 @@ orgTodoToNadaCompleted O.DONE = True
 nadaTodoToOrgSection :: Todo -> O.Section
 nadaTodoToOrgSection Todo{..} = O.Section
   { sectionTodo = Just (nadaCompletedToOrgTodo _todoCompleted)
-  , sectionPriority = Nothing
+  , sectionPriority = Just (nadaPrioToOrgPrio _todoPriority)
   -- FIXME: Eventually we may wish to support more than plaintext todos. We
   -- might do this by changing the type of 'todoName' to 'Data.Org.Words'.
-  , sectionHeading = (NE.singleton (O.Plain $ (T.unlines . Ed.getEditContents) _todoName))
-  , sectionTags = []
+  -- Use `unwords` instead of `unlines`, because the latter adds a new line and 
+  -- which leads to errors in the section fields below (everythng after a new line
+  -- is parsed as sectionDoc)
+  , sectionHeading = (NE.singleton (O.Plain $ (T.unwords . Ed.getEditContents) _todoName))
+  , sectionTags = _todoTags
   , sectionClosed = Nothing
-  , sectionDeadline = Nothing
+  , sectionDeadline = todoDeadline _todoDueDate
   , sectionScheduled = Nothing
   , sectionTimestamp = Nothing
   , sectionProps = mempty
