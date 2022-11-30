@@ -51,6 +51,7 @@ library
     , text
     , time
     , vty
+    , word-wrap
   default-language: Haskell2010
 
 executable nada
@@ -79,6 +80,7 @@ executable nada
     , text
     , time
     , vty
+    , word-wrap
   default-language: Haskell2010
 
 test-suite nada-test
@@ -108,4 +110,5 @@ test-suite nada-test
     , text
     , time
     , vty
+    , word-wrap
   default-language: Haskell2010

@@ -1,6 +1,6 @@
 
 
-* TODO [#B] Add proper state tracking
+* TODO [#B] Add proper state tracking.
 
 
 * DONE [#B] Add/edit files via CLI
@@ -15,5 +15,5 @@
 * TODO [#B] display warning when we don't completely read an input file
 
 
-* TODO [#C] newTask7
+* TODO [#C] anotherTask :home:school:work:
   DEADLINE: <2022-12-31 Sat>

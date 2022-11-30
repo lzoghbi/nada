@@ -77,6 +77,7 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
     , _todoId = TodoId todoId
     , _todoDueDate  = dueDate
     , _todoPriority = priority
+    , _todoTags = sectionTags
     }
 
 findDueDate :: Maybe O.OrgDateTime -> Maybe Day
@@ -145,7 +146,7 @@ nadaTodoToOrgSection Todo{..} = O.Section
   -- which leads to errors in the section fields below (everythng after a new line
   -- is parsed as sectionDoc)
   , sectionHeading = (NE.singleton (O.Plain $ (T.unwords . Ed.getEditContents) _todoName))
-  , sectionTags = []
+  , sectionTags = _todoTags
   , sectionClosed = Nothing
   , sectionDeadline = todoDeadline _todoDueDate
   , sectionScheduled = Nothing
