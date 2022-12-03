@@ -5,14 +5,15 @@ module Nada.App
     ) where
 
 import Nada.Types
+import Nada.Calendar
 
-import qualified Data.Sequence as Seq
 import Data.List (intersperse)
-import Data.Text (Text, unlines, unwords, lines)
+import Data.Text (Text, pack, unlines, unwords, lines, isInfixOf)
 import Data.Text.Zipper (textZipper)
 import Data.Time
   ( formatTime
   , defaultTimeLocale
+  , Day
   )
 import Text.Wrap
   (defaultWrapSettings
@@ -28,19 +29,23 @@ import qualified Brick.AttrMap as A
 import qualified Brick.Widgets.Edit as Ed
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
-import qualified Graphics.Vty as V
-import qualified Graphics.Vty.Input.Events as E
 
 import Control.Monad.State
+import Data.Map (Map(..))
+import qualified Data.Map as Map
+import Data.Sequence (Seq(..))
+import qualified Data.Sequence as Seq
+import qualified Graphics.Vty as V
+import qualified Graphics.Vty.Input.Events as E
 
 import Lens.Micro
 import Lens.Micro.Mtl
 import Lens.Micro.Platform()
 
--- drawTodo i j st draws the i-th Todo of the j-th TodoList in st
-drawTodo :: Integer -> Integer -> NadaState -> Widget Name
-drawTodo iTodo jTodoList st =
-  withStyle $
+-- FIXME: Separate this function from needing integers and use it with the
+-- calendar.
+drawTodoBare :: Integer -> Integer -> NadaState -> Widget Name
+drawTodoBare iTodo jTodoList st =
   verticalB (thisTodo ^. todoPriority)
   <+>
   (padRight (Pad 1) (drawCompleted (thisTodo ^. todoCompleted))
@@ -48,10 +53,29 @@ drawTodo iTodo jTodoList st =
     -- if you want to see the cursor, but with no text rendering, uncomment the following
     -- <+> renderWrappedTxt ((Data.Text.unlines (Ed.getEditContents _todoName)))  
     <+> drawName
+  )
+  where
+    thisTodoId = st ^?! visibleTodoLists.ix (fromInteger jTodoList).todoList.ix (fromInteger iTodo)
+    thisTodo = st ^?! todosMap.ix thisTodoId
+    thisTodoList = st ^?! visibleTodoLists.ix (fromInteger jTodoList)
+    listIsSelected = jTodoList == st ^. selectedTodoList
+    isSelectedTodo = listIsSelected && iTodo == thisTodoList ^. selectedTodo
+    isEditingTodo = isSelectedTodo && (st ^. currentMode == ModeEdit)
+
+    drawName = if isEditingTodo
+                  then Ed.renderEditor (txt . Data.Text.unlines) True (st ^. todoEditor)
+                  else txt (thisTodo ^. todoName)
+    drawCompleted True  = txt "[X]"
+    drawCompleted False = txt "[ ]"
+
+-- drawTodo i j st draws the i-th Todo of the j-th TodoList in st
+drawTodo :: Integer -> Integer -> NadaState -> Widget Name
+drawTodo iTodo jTodoList st =
+  withStyle $
+    drawTodoBare iTodo jTodoList st
     <=> tags
     <=> dueDate
     <=> drawDescription
-  )
   where
     thisTodoId = st ^?! visibleTodoLists.ix (fromInteger jTodoList).todoList.ix (fromInteger iTodo)
     thisTodo = st ^?! todosMap.ix thisTodoId
@@ -63,12 +87,6 @@ drawTodo iTodo jTodoList st =
       | isEditingTodo = forceAttr editingAttr . visible
       | isSelectedTodo = forceAttr selectedAttr . visible
       | otherwise = id
-
-    drawName = if isEditingTodo
-                  then Ed.renderEditor (txt . Data.Text.unlines) True (st ^. todoEditor)
-                  else txt (thisTodo ^. todoName)
-    drawCompleted True  = txt "[X]"
-    drawCompleted False = txt "[ ]"
     drawDescription = padLeft (Pad 6) $ renderWrappedTxt (thisTodo ^. todoDescription)
     tags = padLeft (Pad 4) $ (renderWrappedTxt . Data.Text.unwords) (thisTodo ^. todoTags)
     dueDate  = padLeft (Pad 4) $ hLimit 20 $ strWrapWith settings $
@@ -78,6 +96,7 @@ drawTodo iTodo jTodoList st =
     settings = defaultWrapSettings { preserveIndentation = True
                                    , breakLongWords = True
                                    }
+    
 
 renderWrappedTxt :: Text -> Widget Name
 renderWrappedTxt t = T.Widget T.Fixed T.Fixed
@@ -119,8 +138,8 @@ drawVisibleTodoLists :: NadaState -> Widget Name
 drawVisibleTodoLists st = hBox $ intersperse B.vBorder drawnLists
   where
     drawnLists = do
-      i <- [0..(length (st ^. visibleTodoLists) - 1)]
-      return $ drawTodoList st (toInteger i)
+      i <- toInteger <$> [0..(length (st ^. visibleTodoLists) - 1)]
+      return $ drawTodoList st i
 
 -- Draw the TodoList at the specified index
 drawTodoList :: NadaState -> Integer -> Widget Name
@@ -143,17 +162,19 @@ drawTodoList st jTodoList = T.Widget T.Greedy T.Greedy $
 
 -- Widget - Shortcut info
 shortcutInfoBar :: Widget Name
-shortcutInfoBar = renderWrappedTxt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d]: Delete task  [t]: Toggle [o]: Switch list"
+shortcutInfoBar = renderWrappedTxt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d]: Delete task  [t]: Toggle [o]: Switch list [c]: Calendar view"
 
 currentModeBar :: NadaState -> Widget Name
 currentModeBar st = str $ show $ st ^. currentMode
 
 -- Scroll functionality for Todo Viewport
 vp0Scroll :: M.ViewportScroll Name
-vp0Scroll = M.viewportScroll NadaVP
+vp0Scroll = M.viewportScroll mkNadaVP
 
 nadaAppDraw :: NadaState -> [Widget Name]
-nadaAppDraw st = [ui]
+nadaAppDraw st = case _currentMode st of
+  ModeCalendar -> [drawCalendar (_calendarState st)]
+  _            -> [ui]
   where
     ui = vBox [drawVisibleTodoLists st
               ,currentModeBar st
@@ -217,8 +238,33 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
                                                             then 0 
                                                             else i
                                 return ()
+  V.EvKey (V.KChar 'c') [] -> do
+                                freshCalendarState <- liftIO $ makeCalendarStateForCurrentDay
+                                todos <- getBareTodosByDate <$> get
+                                let cs = freshCalendarState{calendarWidgets = addToCalendarWidgets todos}
+                                modify (calendarState .~ cs)
+                                modify (currentMode .~ ModeCalendar)
   _ -> return ()
 appEventNormal _ = return ()
+
+-- FIXME: This is horrific
+getBareTodosByDate :: NadaState -> [(Day, Widget Name)]
+getBareTodosByDate st = do
+  todo <- Map.elems $ (st ^. todosMap)
+  case todo ^. todoDueDate of
+    Just dueDate -> pure $ (dueDate, drawTodoSimple todo)
+    Nothing -> []
+  where
+    drawTodoSimple todo = txtWrapWith settings $
+      renderCompleted (todo ^. todoCompleted) <> (todo ^. todoName)
+    renderCompleted True  = "[X] "
+    renderCompleted False = "[ ] "
+    settings = defaultWrapSettings { preserveIndentation = True
+                                   , breakLongWords = True
+                                   }
+
+addToCalendarWidgets :: [(Day, Widget Name)] -> Map Day [Widget Name]
+addToCalendarWidgets = foldr (\(day, widget) m -> Map.insertWith (<>) day [widget] m) mempty
 
 appEventEdit :: BrickEvent Name e -> EventM Name NadaState ()
 appEventEdit ev = case ev of
@@ -233,11 +279,13 @@ appEventEdit ev = case ev of
 appEvent :: BrickEvent Name e -> EventM Name NadaState ()
 appEvent ev = do
                 mode <- use currentMode
-                if mode == ModeNormal
-                  then appEventNormal ev
-                else if mode == ModeEdit
-                  then appEventEdit ev
-                else return ()
+                case mode of
+                  ModeNormal   -> appEventNormal ev
+                  ModeEdit     -> appEventEdit ev
+                  ModeCalendar -> appEventCalendar exitCalendar calendarState ev
+                  _            -> return ()
+  where
+    exitCalendar = modify (currentMode .~ ModeNormal)
 
 selectedAttr :: AttrName
 selectedAttr = attrName "selected"

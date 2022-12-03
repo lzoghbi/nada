@@ -4,7 +4,7 @@ module Main (main) where
 
 import qualified Brick
 import qualified Brick.Widgets.Edit as Ed
-import Nada.Types 
+import Nada.Types hiding (Edit)
 import Nada.App
 import Nada.Org
 import Data.Text (Text, unpack, splitOn, isInfixOf)
@@ -100,7 +100,7 @@ openNadaFile filePath = do
   -- We use the "raw" org file parsers because Data.Org does not expose a
   -- parser that gives information on why the parse failed.
   case parse O.orgFile filePath rawOrgFile of
-    Right orgFile -> return (orgFileToNada orgFile)
+    Right orgFile -> orgFileToNada orgFile
     Left parseError -> do
       putStrLn "Encountered an error trying to parse the org file:"
       putStrLn (errorBundlePretty parseError)
@@ -143,11 +143,11 @@ add _ _ _ _ _ _ = return ()
 --   -- FIXME: Write a helper function for this
 --   let newIntId = toInteger $ Seq.length (_todoList nadaState) + 1
 --   let newTodo = Todo 
---               { _todoName = Ed.editorText (EditorId newIntId) Nothing todo
+--               { _todoName = Ed.editorText (mkTodoEditor) Nothing todo
 --               , _todoDescription = fromMaybe "" todoDesc
 --               , _todoCompleted = False
 --               -- FIXME: Use proper id generation
---               , _todoId = TodoId newIntId
+--               , _todoId = mkTodoId newIntId
 --               , _todoDueDate  = toNadaDeadline date
 --               , _todoPriority = toNadaPriority todoPrio
 --               , _todoTags     = toNadaTags tags
