@@ -38,6 +38,7 @@ data NadaState = NadaState
   { _todoList :: Seq Todo
   , _selectedTodo :: Integer
   , _mode :: NadaMode
+  , _filterText :: Text
   }
   deriving (Show)
 
@@ -48,6 +49,7 @@ testNadaState :: NadaState
 testNadaState = NadaState { _todoList = Seq.fromList $ [todo1, todo2]
                           , _selectedTodo = -1
                           , _mode = Normal
+                          , _filterText = ""
                           }
  where
   todo1 = Todo

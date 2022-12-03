@@ -6,7 +6,7 @@ module Nada.App
 
 import Nada.Types
 import Data.List (intersperse)
-import Data.Text (Text, pack, unlines, unwords)
+import Data.Text (Text, pack, unlines, unwords, isInfixOf)
 import Data.Time 
   ( formatTime
   , defaultTimeLocale
@@ -131,7 +131,10 @@ getAllTodos NadaState {..} = do
         | isFocused = forceAttr editingAttr . visible
         | isSelected = forceAttr selectedAttr . visible
         | otherwise = id
-  return $ withStyle $ drawTodo (_todoList `Seq.index` i) isFocused
+  let todo = _todoList `Seq.index` i
+  case _filterText `isInfixOf` (Data.Text.unlines . Ed.getEditContents . _todoName $ todo) of
+    False -> []
+    True  -> return $ withStyle $ drawTodo todo isFocused
 
 -- Widget - Shortcut info
 shortcutInfoBar :: Widget Name

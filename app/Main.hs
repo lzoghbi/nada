@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RecordWildCards #-}
 module Main (main) where
 
 import qualified Brick
@@ -7,7 +7,7 @@ import qualified Brick.Widgets.Edit as Ed
 import Nada.Types (NadaState(..), Todo(..), Name(..), NadaPriority(..))
 import Nada.App
 import Nada.Org
-import Data.Text (Text, unpack, splitOn)
+import Data.Text (Text, unpack, splitOn, isInfixOf)
 import qualified Data.Text.IO as Text
 import qualified Data.Org as O
 import Options.Applicative
@@ -15,19 +15,22 @@ import System.Environment (lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
 import qualified Data.Sequence as Seq
 import Data.Maybe (fromMaybe)
+import Data.Time (Day, parseTimeM, defaultTimeLocale)
+
 -- For getting the error message when parsing the org file
 import Text.Megaparsec (parse, errorBundlePretty)
-import Data.Time (Day, parseTimeM, defaultTimeLocale)
 
 
 data Command
   = Add Text (Maybe Text) (Maybe Text) (Maybe Text) (Maybe Text)
-  | Edit
+  | Edit Text
+  | Complete Text
 
 commandParser :: Parser Command
 commandParser = subparser
   (  command "add" (info addCommand (progDesc "Add a todo to the list"))
   <> command "edit" (info editCommand (progDesc "Open a TUI to edit the list"))
+  <> command "complete" (info completeCommand (progDesc "Mark a todo as complete"))
   )
   where
     addCommand = Add
@@ -56,7 +59,21 @@ commandParser = subparser
           <> help "(Optional) Description for the todo"
           )             
       <**> helper
-    editCommand = pure Edit <**> helper
+    editCommand = Edit 
+      <$> strOption
+          (  long "query"
+          <> short 'q'
+          <> metavar "QUERY"
+          <> value ""
+          <> help "Query used to filter shown todos"
+          )
+      <**> helper
+    completeCommand = Complete
+      <$> strArgument
+          (  metavar "TODO"
+          <> help "Todo to complete"
+          )
+      <**> helper
 
 argParser :: Parser (Maybe FilePath, Command)
 argParser = (,)
@@ -88,10 +105,10 @@ openNadaFile filePath = do
       putStrLn (errorBundlePretty parseError)
       exitFailure
 
-edit :: FilePath -> IO ()
-edit filePath = do
+edit :: FilePath -> Text -> IO ()
+edit filePath filterText = do
   nadaState <- openNadaFile filePath
-  finalNadaState <- Brick.defaultMain nadaApp nadaState
+  finalNadaState <- Brick.defaultMain nadaApp nadaState{_filterText = filterText}
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 
@@ -131,6 +148,24 @@ add filePath todo date todoPrio tags todoDesc = do
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 
+complete :: FilePath -> Text -> IO ()
+complete filePath queryText = do
+  nadaState <- openNadaFile filePath
+  case Seq.findIndicesL incompleteTodoMatchesQuery (_todoList nadaState) of
+    [] -> do
+      Text.putStrLn ("No todo matching '" <> queryText <> "' found.")
+      exitFailure
+    [todoIndex] -> do
+      let finalNadaState = nadaState{_todoList = Seq.adjust' completeTodo todoIndex (_todoList nadaState)}
+      Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
+    _ -> do
+      -- In the case of multiple indices, we don't know which to pick, so have
+      -- the user.
+      edit filePath queryText
+  where
+    incompleteTodoMatchesQuery Todo{..} = any (queryText `isInfixOf`) (Ed.getEditContents _todoName) && not _todoCompleted
+    completeTodo todo = todo{_todoCompleted = True}
+
 main :: IO ()
 main = do
   defaultNadaFile <- lookupEnv "NADA_FILE"
@@ -141,5 +176,6 @@ main = do
       putStrLn "No file specified, please specify a file using --file or the environmental variable NADA_FILE. For more information run"
       putStrLn "  nada --help"
       exitFailure
-    (Just nadaFile, Edit) -> edit nadaFile
+    (Just nadaFile, Edit filterText) -> edit nadaFile filterText
     (Just nadaFile, Add todo date todoPrio tags todoDesc) -> add nadaFile todo date todoPrio tags todoDesc 
+    (Just nadaFile, Complete queryText) -> complete nadaFile queryText

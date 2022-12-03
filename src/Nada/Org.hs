@@ -41,6 +41,7 @@ orgFileToNada org = NadaState{..}
     _todoList = Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
     _selectedTodo = 0
     _mode = Normal  
+    _filterText = ""
     
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
 orgSectionToNadaTodo (todoId, O.Section{..}) = do
