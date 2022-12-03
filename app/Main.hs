@@ -158,6 +158,7 @@ complete filePath queryText = do
     [todoIndex] -> do
       let finalNadaState = nadaState{_todoList = Seq.adjust' completeTodo todoIndex (_todoList nadaState)}
       Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
+      exitSuccess
     _ -> do
       -- In the case of multiple indices, we don't know which to pick, so have
       -- the user.
