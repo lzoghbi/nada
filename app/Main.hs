@@ -108,7 +108,9 @@ openNadaFile filePath = do
 edit :: FilePath -> Text -> IO ()
 edit filePath filterText = do
   nadaState <- openNadaFile filePath
-  finalNadaState <- Brick.defaultMain nadaApp nadaState{_filterText = filterText}
+  -- Ignoring the filter text for now
+  -- finalNadaState <- Brick.defaultMain nadaApp nadaState{_filterText = filterText}
+  finalNadaState <- Brick.defaultMain nadaApp nadaState
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 
@@ -130,42 +132,48 @@ toNadaTags Nothing  = []
 toNadaTags (Just t) = splitOn "," t
 
 add :: FilePath -> Text -> Maybe Text -> Maybe Text -> Maybe Text -> Maybe Text -> IO ()
-add filePath todo date todoPrio tags todoDesc = do
-  nadaState <- openNadaFile filePath
-  -- FIXME: Write a helper function for this
-  let newIntId = toInteger $ Seq.length (_todoList nadaState) + 1
-  let newTodo = Todo 
-              { _todoName = Ed.editorText (EditorId newIntId) Nothing todo
-              , _todoDescription = fromMaybe "" todoDesc
-              , _todoCompleted = False
-              -- FIXME: Use proper id generation
-              , _todoId = TodoId newIntId
-              , _todoDueDate  = toNadaDeadline date
-              , _todoPriority = toNadaPriority todoPrio
-              , _todoTags     = toNadaTags tags
-              }            
-      finalNadaState = nadaState{ _todoList = _todoList nadaState Seq.:|> newTodo } 
-  Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
-  exitSuccess
+add _ _ _ _ _ _ = return ()
+-- ---------------- RECOVER FROM HERE -----------------------
+-- add filePath todo date todoPrio tags todoDesc = do
+--   nadaState <- openNadaFile filePath
+--   -- FIXME: Write a helper function for this
+--   let newIntId = toInteger $ Seq.length (_todoList nadaState) + 1
+--   let newTodo = Todo 
+--               { _todoName = Ed.editorText (EditorId newIntId) Nothing todo
+--               , _todoDescription = fromMaybe "" todoDesc
+--               , _todoCompleted = False
+--               -- FIXME: Use proper id generation
+--               , _todoId = TodoId newIntId
+--               , _todoDueDate  = toNadaDeadline date
+--               , _todoPriority = toNadaPriority todoPrio
+--               , _todoTags     = toNadaTags tags
+--               }            
+--       finalNadaState = nadaState{ _todoList = _todoList nadaState Seq.:|> newTodo } 
+--   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
+--   exitSuccess
+-- -------------------- TO HERE ------------------------------
 
 complete :: FilePath -> Text -> IO ()
-complete filePath queryText = do
-  nadaState <- openNadaFile filePath
-  case Seq.findIndicesL incompleteTodoMatchesQuery (_todoList nadaState) of
-    [] -> do
-      Text.putStrLn ("No todo matching '" <> queryText <> "' found.")
-      exitFailure
-    [todoIndex] -> do
-      let finalNadaState = nadaState{_todoList = Seq.adjust' completeTodo todoIndex (_todoList nadaState)}
-      Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
-      exitSuccess
-    _ -> do
-      -- In the case of multiple indices, we don't know which to pick, so have
-      -- the user.
-      edit filePath queryText
-  where
-    incompleteTodoMatchesQuery Todo{..} = any (queryText `isInfixOf`) (Ed.getEditContents _todoName) && not _todoCompleted
-    completeTodo todo = todo{_todoCompleted = True}
+complete _ _ = return ()
+-- -------------------- RECOVER FROM HERE -------------------------
+-- complete filePath queryText = do
+--   nadaState <- openNadaFile filePath
+--   case Seq.findIndicesL incompleteTodoMatchesQuery (_todoList nadaState) of
+--     [] -> do
+--       Text.putStrLn ("No todo matching '" <> queryText <> "' found.")
+--       exitFailure
+--     [todoIndex] -> do
+--       let finalNadaState = nadaState{_todoList = Seq.adjust' completeTodo todoIndex (_todoList nadaState)}
+--       Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
+--       exitSuccess
+--     _ -> do
+--       -- In the case of multiple indices, we don't know which to pick, so have
+--       -- the user.
+--       edit filePath queryText
+--   where
+--     incompleteTodoMatchesQuery Todo{..} = any (queryText `isInfixOf`) (Ed.getEditContents _todoName) && not _todoCompleted
+--     completeTodo todo = todo{_todoCompleted = True}
+-- ---------------------- TO HERE --------------------------------
 
 main :: IO ()
 main = do

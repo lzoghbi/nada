@@ -3,14 +3,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Nada.Types where
 
-import Data.Sequence (Seq(..))
 import qualified Data.Sequence as Seq
 import Data.Text
-import qualified Brick.Widgets.Edit as Ed
-import Lens.Micro
-import Lens.Micro.TH (makeLenses)
 import Data.Time (Day)
 import qualified Data.Map as Map
+import Data.Foldable (toList)
+
+import qualified Brick.Widgets.Edit as Ed
+
+import Lens.Micro
+import Lens.Micro.TH (makeLenses)
 
 data Name = TodoId Integer
           | EditorId Integer
@@ -38,8 +40,13 @@ data Todo = Todo
 
 data TodoList = TodoList
   { _todoListName :: Text
+  
   -- _todoList are the IDs of the Todos in the list
-  , _todoList :: [Integer]
+  , _todoList :: Seq.Seq Integer
+  
+  -- The index in the list of the currently selected Todo
+  -- This is NOT the global ID of the Todo
+  , _selectedTodo :: Integer
   }
   deriving (Show)
 
@@ -47,10 +54,8 @@ data NadaState = NadaState
   { _visibleTodoLists :: [TodoList]
   , _todosMap :: Map.Map Integer Todo
   , _nextAvailableId :: Integer
-  -- _selecterItem == (l, t) indicates that the current selection is
-  -- the t-th item of the l-th list
-  , _selectedItem :: (Integer, Integer)
-  , _mode :: NadaMode
+  , _selectedTodoList :: Integer
+  , _currentMode :: NadaMode
   -- , _filterText :: Text
   }
   deriving (Show)
@@ -67,7 +72,7 @@ resourceNameToInteger NadaVP = error "NadaVp does not have an integer id"
 -- Create a default Todo with a given ID
 defaultTodo :: Integer -> Todo
 defaultTodo intId = Todo {
-  _todoName = Ed.editorText (EditorId intId) (Just 1) ""
+  _todoName = Ed.editorText (EditorId intId) (Just 1) "new todo c:"
 , _todoDescription = ""
 , _todoCompleted = False
 , _todoId = TodoId intId
@@ -78,8 +83,9 @@ defaultTodo intId = Todo {
 
 defaultTodoList :: TodoList
 defaultTodoList = TodoList {
-  _todoListName = ""
-, _todoList = []
+  _todoListName = "Todos"
+, _todoList = Seq.empty
+, _selectedTodo = 0
 }
 
 defaultNadaState :: NadaState
@@ -88,8 +94,8 @@ defaultNadaState = NadaState {
   _visibleTodoLists = [defaultTodoList]
 , _todosMap = Map.empty
 , _nextAvailableId = 0
-, _selectedItem = (0, 0)
-, _mode = Normal
+, _selectedTodoList = 0
+, _currentMode = Normal
 }
 
 -- Set the ID of a Todo, updating also the ID of the Editor inside
@@ -124,30 +130,4 @@ getTodosFromIdxList st idxs = Prelude.map ((st^.todosMap) Map.!) idxs
 
 -- Get the actual list of Todos for the List at the specified index
 getActualTodoList :: NadaState -> Int -> [Todo]
-getActualTodoList st i = getTodosFromIdxList st (st^.(visibleTodoLists.ix i.todoList))
-
--- testNadaState :: NadaState
--- testNadaState = NadaState { _todoList = Seq.fromList $ [todo1, todo2]
---                           , _selectedTodo = -1
---                           , _mode = Normal
---                           , _filterText = ""
---                           }
---  where
---   todo1 = Todo
---             { _todoName = Ed.editorText (EditorId 100) Nothing "test1"
---             , _todoDescription = "description 1"
---             , _todoCompleted = True
---             , _todoId = TodoId 100
---             , _todoDueDate = Nothing
---             , _todoPriority = High
---             , _todoTags = []
---             }
---   todo2 = Todo
---             { _todoName = Ed.editorText (EditorId 200) Nothing "test2"
---             , _todoDescription = "description 2"
---             , _todoCompleted = False
---             , _todoId = TodoId 200
---             , _todoDueDate = Nothing
---             , _todoPriority = High
---             , _todoTags = []
---             }
+getActualTodoList st i = getTodosFromIdxList st $ toList (st^.(visibleTodoLists.ix i.todoList))

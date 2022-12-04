@@ -20,7 +20,6 @@ import qualified Data.Text as T
 import Data.Time (Day, dayOfWeek)
 import Brick.Widgets.Edit as Ed
 import Lens.Micro
-import qualified Data.Map as Map
 
 -- | Converts an 'OrgFile' to a 'NadaState'
 --
@@ -34,19 +33,14 @@ orgFileToNada :: O.OrgFile -> NadaState
 -- convert a section to a 'Todo' (represented as 'orgSectionToNadaTodo'
 -- returning 'Nothing').
 -- Reserved 0 - 9 for other clickable widgets.
-orgFileToNada org = newState & (visibleTodoLists.ix 0.todoList) .~ assignedIds
+orgFileToNada org = newState & (visibleTodoLists.ix 0.todoList) .~ Seq.fromList assignedIds
   where
     docSections = O.docSections $ O.orgDoc org
     correctlyParsedTodos = catMaybes $ orgSectionToNadaTodo <$> zip [0..] docSections
     (newState, assignedIds) = addTodosToState defaultNadaState correctlyParsedTodos
-    -- assignedIds = map (resourceNameToInteger.(^.todoId)) correctlyParsedTodos
-    -- lastAssignedId = case assignedIds of 
-    --   [] -> -1
-    --   _ -> last assignedIds
-    -- orgTodoList = Map.fromList []
     
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
-orgSectionToNadaTodo (todoId, O.Section{..}) = do
+orgSectionToNadaTodo (tdId, O.Section{..}) = do
   -- FIXME: We return 'Nothing' if the 'Section' is missing 'sectionTodo'.
   --
   -- In the future we might consider it valid to have a section without a todo
@@ -61,7 +55,7 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
       dueDate  = findDueDate sectionDeadline
       priority = orgPrioToNadaPrio sectionPriority      
   pure $ Todo
-    { _todoName = Ed.editorText (EditorId todoId) (Just 1) name
+    { _todoName = Ed.editorText (EditorId tdId) (Just 1) name
     -- FIXME: We might want to change the 'Todo' datatype to have
     -- 'todoCompleted' be 'Maybe Text' instead of 'Text'. Right now we're
     -- converting the 'Nothing' case to the empty string, but they might be
@@ -79,7 +73,7 @@ orgSectionToNadaTodo (todoId, O.Section{..}) = do
     -- The more natural thing to do would be to just return the largest id from
     -- 'orgFileToNada'. Or eventually rework this function to make use of
     -- our function to create a new todo (once implemented).
-    , _todoId = TodoId todoId
+    , _todoId = TodoId tdId
     , _todoDueDate  = dueDate
     , _todoPriority = priority
     , _todoTags = sectionTags
@@ -165,5 +159,5 @@ nadaToOrgFile :: NadaState -> O.OrgFile
 -- FIXME: Eventually we will likely do more than just render sections.
 nadaToOrgFile st = O.emptyOrgFile{O.orgDoc = O.emptyDoc{O.docSections = sections}}
   where
-    -- FIXME: This will only save the first TodoList 
-    sections = toList (nadaTodoToOrgSection <$> (getActualTodoList st 0))
+    -- FIXME: This will only save the FIRST TodoList 
+    sections = toList (nadaTodoToOrgSection <$> getActualTodoList st 0)
