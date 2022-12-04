@@ -18,10 +18,9 @@ import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (Day, dayOfWeek)
-
 import Brick.Widgets.Edit as Ed
-
-import Brick.Widgets.Edit as Ed
+import Lens.Micro
+import qualified Data.Map as Map
 
 -- | Converts an 'OrgFile' to a 'NadaState'
 --
@@ -35,13 +34,16 @@ orgFileToNada :: O.OrgFile -> NadaState
 -- convert a section to a 'Todo' (represented as 'orgSectionToNadaTodo'
 -- returning 'Nothing').
 -- Reserved 0 - 9 for other clickable widgets.
-orgFileToNada org = NadaState{..}
+orgFileToNada org = newState & (visibleTodoLists.ix 0.todoList) .~ assignedIds
   where
-    orgDoc = O.orgDoc org
-    _todoList = Seq.fromList . catMaybes $ orgSectionToNadaTodo <$> zip [10..] (O.docSections orgDoc)
-    _selectedTodo = 0
-    _mode = Normal  
-    _filterText = ""
+    docSections = O.docSections $ O.orgDoc org
+    correctlyParsedTodos = catMaybes $ orgSectionToNadaTodo <$> zip [0..] docSections
+    (newState, assignedIds) = addTodosToState defaultNadaState correctlyParsedTodos
+    -- assignedIds = map (resourceNameToInteger.(^.todoId)) correctlyParsedTodos
+    -- lastAssignedId = case assignedIds of 
+    --   [] -> -1
+    --   _ -> last assignedIds
+    -- orgTodoList = Map.fromList []
     
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
 orgSectionToNadaTodo (todoId, O.Section{..}) = do
@@ -161,6 +163,7 @@ nadaTodoToOrgSection Todo{..} = O.Section
 
 nadaToOrgFile :: NadaState -> O.OrgFile
 -- FIXME: Eventually we will likely do more than just render sections.
-nadaToOrgFile (NadaState{..}) = O.emptyOrgFile{O.orgDoc = O.emptyDoc{O.docSections = sections}}
+nadaToOrgFile st = O.emptyOrgFile{O.orgDoc = O.emptyDoc{O.docSections = sections}}
   where
-    sections = toList (nadaTodoToOrgSection <$> _todoList)
+    -- FIXME: This will only save the first TodoList 
+    sections = toList (nadaTodoToOrgSection <$> (getActualTodoList st 0))

@@ -115,12 +115,12 @@ drawTodos st =  T.Widget T.Greedy T.Greedy $
     $ getAllTodos st
     )
     -- Make other categories of tasks, like overdue tasks or filtered by tag
-    <+>
-    ( B.borderWithLabel (str "Other tasks") 
-    $ vBox 
-    $ intersperse B.hBorder
-    $ getAllTodos testNadaState
-    )
+    -- <+>
+    -- ( B.borderWithLabel (str "Other tasks") 
+    -- $ vBox 
+    -- $ intersperse B.hBorder
+    -- $ getAllTodos testNadaState
+    -- )
 
 getAllTodos :: NadaState -> [Widget Name]
 getAllTodos NadaState {..} = do
