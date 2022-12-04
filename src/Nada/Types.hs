@@ -12,6 +12,7 @@ import Data.Foldable (toList)
 import qualified Brick.Widgets.Edit as Ed
 
 import Lens.Micro
+import Lens.Micro.GHC
 import Lens.Micro.TH (makeLenses)
 
 data Name = TodoId Integer
@@ -24,7 +25,7 @@ data NadaPriority = High
                   | Low 
    deriving (Eq, Show)
 
-data NadaMode = Normal | Edit
+data NadaMode = ModeNormal | ModeEdit
   deriving (Eq, Show)
 
 data Todo = Todo 
@@ -95,7 +96,7 @@ defaultNadaState = NadaState {
 , _todosMap = Map.empty
 , _nextAvailableId = 0
 , _selectedTodoList = 0
-, _currentMode = Normal
+, _currentMode = ModeNormal
 }
 
 -- Set the ID of a Todo, updating also the ID of the Editor inside
@@ -129,5 +130,19 @@ getTodosFromIdxList :: NadaState -> [Integer] -> [Todo]
 getTodosFromIdxList st idxs = Prelude.map ((st^.todosMap) Map.!) idxs
 
 -- Get the actual list of Todos for the List at the specified index
-getActualTodoList :: NadaState -> Int -> [Todo]
-getActualTodoList st i = getTodosFromIdxList st $ toList (st^.(visibleTodoLists.ix i.todoList))
+getActualTodoList :: NadaState -> Integer -> [Todo]
+getActualTodoList st i = getTodosFromIdxList st $ toList (st^.(visibleTodoLists.ix (fromInteger i).todoList))
+
+getAllTodoIds :: NadaState -> [Integer]
+getAllTodoIds st = Map.keys (st^.todosMap)
+
+addTodoListToState :: TodoList -> NadaState -> NadaState
+addTodoListToState tdl st = st & visibleTodoLists %~ (++ [tdl])
+
+getSelectedTodoId :: NadaState -> Integer
+getSelectedTodoId st = selTodoId
+  where
+    selTodoId = st^?!(selTodoList.todoList.ix (fromInteger selTodoPos))
+    selTodoPos = st^?!selTodoList.selectedTodo
+    selTodoList = visibleTodoLists.ix (fromInteger selTodoListPos)
+    selTodoListPos = st^.selectedTodoList

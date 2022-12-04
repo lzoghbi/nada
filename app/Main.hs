@@ -4,7 +4,7 @@ module Main (main) where
 
 import qualified Brick
 import qualified Brick.Widgets.Edit as Ed
-import Nada.Types (NadaState(..), Todo(..), Name(..), NadaPriority(..))
+import Nada.Types 
 import Nada.App
 import Nada.Org
 import Data.Text (Text, unpack, splitOn, isInfixOf)
@@ -16,6 +16,7 @@ import System.Exit (exitFailure, exitSuccess)
 import qualified Data.Sequence as Seq
 import Data.Maybe (fromMaybe)
 import Data.Time (Day, parseTimeM, defaultTimeLocale)
+import Lens.Micro
 
 -- For getting the error message when parsing the org file
 import Text.Megaparsec (parse, errorBundlePretty)
@@ -108,6 +109,9 @@ openNadaFile filePath = do
 edit :: FilePath -> Text -> IO ()
 edit filePath filterText = do
   nadaState <- openNadaFile filePath
+  -- let moreTodoList = defaultTodoList & todoListName .~ "More todos"
+  --                                    & todoList .~ Seq.fromList (getAllTodoIds nadaState)
+  -- let nadaState' = addTodoListToState moreTodoList nadaState
   -- Ignoring the filter text for now
   -- finalNadaState <- Brick.defaultMain nadaApp nadaState{_filterText = filterText}
   finalNadaState <- Brick.defaultMain nadaApp nadaState

@@ -123,7 +123,7 @@ drawTodoList st todoListIdx = T.Widget T.Greedy T.Greedy $
     drawnTodos = do
         i <- [0..(length (tdl^.todoList) - 1)]
         let isSelected = listIsSelected && toInteger i == tdl^.selectedTodo
-        let isFocused = isSelected && (st^.currentMode == Edit)
+        let isFocused = isSelected && (st^.currentMode == ModeEdit)
         let withStyle
               | isFocused = forceAttr editingAttr . visible
               | isSelected = forceAttr selectedAttr . visible
@@ -174,7 +174,7 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
   V.EvKey (V.KChar 'q') [] -> do
                                 _ <- get
                                 halt
-  V.EvKey (V.KChar 'e') [] -> currentMode .= Edit
+  V.EvKey (V.KChar 'e') [] -> currentMode .= ModeEdit
   V.EvKey (V.KChar 'j') [] -> do
                                 listIdx <- use selectedTodoList
                                 zoom (visibleTodoLists.ix (fromInteger listIdx)) $
@@ -207,31 +207,25 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
   -- Might want to create a lensSelectedTodoList and lensSelectedTodo
   V.EvKey (V.KChar 't') [] -> do
                                 st <- get 
-                                let listIdx = st^.selectedTodoList
-                                let currentTodoList = visibleTodoLists.ix (fromInteger listIdx)
-                                let selIdx = st^?!currentTodoList.selectedTodo
-                                let selTodoId = st^?!(currentTodoList.todoList.ix (fromInteger selIdx))
+                                let selTodoId = getSelectedTodoId st
                                 todosMap.ix selTodoId.todoCompleted %= not
   _ -> return ()
 appEventNormal _ = return ()
 
 appEventEdit :: BrickEvent Name e -> EventM Name NadaState ()
 appEventEdit ev = case ev of
-  (VtyEvent (V.EvKey V.KEsc [])) -> currentMode .= Normal
+  (VtyEvent (V.EvKey V.KEsc [])) -> currentMode .= ModeNormal
   _ -> do
-          st <- get 
-          let listIdx = st^.selectedTodoList
-          let currentTodoList = visibleTodoLists.ix (fromInteger listIdx)
-          let selIdx = st^?!currentTodoList.selectedTodo
-          let selTodoId = st^?!(currentTodoList.todoList.ix (fromInteger selIdx))
+          st <- get
+          let selTodoId = getSelectedTodoId st
           zoom (todosMap.ix selTodoId.todoName) $ Ed.handleEditorEvent ev
 
 appEvent :: BrickEvent Name e -> EventM Name NadaState ()
 appEvent ev = do
                 mode <- use currentMode
-                if mode == Normal
+                if mode == ModeNormal
                   then appEventNormal ev
-                else if mode == Edit
+                else if mode == ModeEdit
                   then appEventEdit ev
                 else return ()
 
