@@ -55,7 +55,7 @@ orgSectionToNadaTodo (tdId, O.Section{..}) = do
       dueDate  = findDueDate sectionDeadline
       priority = orgPrioToNadaPrio sectionPriority      
   pure $ Todo
-    { _todoName = Ed.editorText (EditorId tdId) (Just 1) name
+    { _todoName = name
     -- FIXME: We might want to change the 'Todo' datatype to have
     -- 'todoCompleted' be 'Maybe Text' instead of 'Text'. Right now we're
     -- converting the 'Nothing' case to the empty string, but they might be
@@ -144,7 +144,7 @@ nadaTodoToOrgSection Todo{..} = O.Section
   -- Use `unwords` instead of `unlines`, because the latter adds a new line and 
   -- which leads to errors in the section fields below (everythng after a new line
   -- is parsed as sectionDoc)
-  , sectionHeading = (NE.singleton (O.Plain $ (T.unwords . Ed.getEditContents) _todoName))
+  , sectionHeading = NE.singleton (O.Plain _todoName)
   , sectionTags = _todoTags
   , sectionClosed = Nothing
   , sectionDeadline = todoDeadline _todoDueDate

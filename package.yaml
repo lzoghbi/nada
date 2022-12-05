@@ -36,6 +36,7 @@ dependencies:
 - megaparsec
 - time
 - word-wrap
+- text-zipper
 
 ghc-options:
 - -Wall
