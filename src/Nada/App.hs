@@ -162,7 +162,7 @@ shortcutInfoBar = renderWrappedTxt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d
 
 -- Widget - Shortcut for edit info
 shortcutModifyInfoBar :: Widget Name
-shortcutModifyInfoBar = renderWrappedTxt "[e]: Edit Title  [r]: Edit Tags"
+shortcutModifyInfoBar = renderWrappedTxt "[w]: Edit deadline  [e]: Edit title  [r]: Edit tags"
 
 currentModeBar :: NadaState -> Widget Name
 currentModeBar st = str $ show $ st ^. currentMode
