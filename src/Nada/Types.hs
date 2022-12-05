@@ -9,6 +9,7 @@ import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import Data.Text
 import Data.Time (Day, showGregorian)
+import Data.Time.Clock.System (systemEpochDay)
 
 import qualified Brick.Widgets.Edit as Ed
 
@@ -149,9 +150,9 @@ getSelectedTodoId st = selTodoId
     selTodoList = visibleTodoLists . ix (fromInteger selTodoListPos)
     selTodoListPos = st ^. selectedTodoList
 
-showDay :: Maybe Day -> [Text]
-showDay (Just a) = [Data.Text.pack $ showGregorian a]
-showDay Nothing  = [Data.Text.pack $ showGregorian (toEnum 0)]
+showDate :: Maybe Day -> [Text]
+showDate (Just a) = [Data.Text.pack $ showGregorian a]
+showDate Nothing  = [Data.Text.pack $ showGregorian systemEpochDay]
 
 
 

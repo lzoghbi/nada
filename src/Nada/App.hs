@@ -207,7 +207,7 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
     st <- get
     let selTodoId = getSelectedTodoId st
     let selTodo = st ^?! todosMap . ix selTodoId
-    todoEditor %= Ed.applyEdit (const $ textZipper (showDay (selTodo ^. todoDueDate)) (Just 1))
+    todoEditor %= Ed.applyEdit (const $ textZipper (showDate (selTodo ^. todoDueDate)) (Just 1))
     currentMode .= ModeEditDeadline
   V.EvKey (V.KChar 'j') [] -> do
     listIdx <- use selectedTodoList
@@ -260,11 +260,16 @@ appEventEdit ev = case ev of
     st <- get
     let contents = Ed.getEditContents $ st ^. todoEditor
     let selTodoId = getSelectedTodoId st
+    let theText = Data.Text.unlines contents
     mode <- use currentMode
     case mode of
-      ModeEdit -> todosMap . ix selTodoId . todoName .= Data.Text.unlines contents
-      ModeEditTag -> todosMap . ix selTodoId . todoTags .= Data.Text.words (Data.Text.unlines contents)
-      ModeEditDeadline -> todosMap . ix selTodoId . todoDueDate .= Just (readTime defaultTimeLocale "%Y-%m-%d" (Data.Text.unpack $ Data.Text.unlines contents) :: Day)
+      ModeEdit -> todosMap . ix selTodoId . todoName .= theText
+      ModeEditTag -> todosMap . ix selTodoId . todoTags .= Data.Text.words (theText)
+      ModeEditDeadline -> 
+        todosMap . ix selTodoId . todoDueDate .=
+          if theText /= "\n"
+            then Just (readTime defaultTimeLocale "%Y-%m-%d" (Data.Text.unpack theText) :: Day)
+            else Nothing
     currentMode .= ModeNormal
   _ -> zoom todoEditor $ Ed.handleEditorEvent ev
 
