@@ -85,7 +85,7 @@ resourceNameToInteger (OtherName (TodoId n)) = n
 -- Create a default Todo with a given ID
 defaultTodo :: Integer -> Todo
 defaultTodo intId = Todo {
-  _todoName = "new todo c:"
+  _todoName = "todo"
 , _todoDescription = ""
 , _todoCompleted = False
 , _todoId = mkTodoId intId
