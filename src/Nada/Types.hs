@@ -16,7 +16,7 @@ import Lens.Micro.GHC ()
 import Lens.Micro.TH (makeLenses)
 
 data Name = TodoId Integer
-          | NadaVP
+          | NadaVP Integer
           | TodoEditor
   deriving (Eq, Show, Ord)
 
@@ -36,6 +36,7 @@ data Todo = Todo
   , _todoDueDate :: Maybe Day
   , _todoPriority :: NadaPriority
   , _todoTags :: [Text]
+  , _todoSubTasks :: [Todo]
   }
   deriving (Show)
 
@@ -58,6 +59,7 @@ data NadaState = NadaState
   , _nextAvailableId :: Integer
   , _selectedTodoList :: Integer
   , _currentMode :: NadaMode
+  , _allTags :: [Text]
   -- , _filterText :: Text
   }
   deriving (Show)
@@ -97,6 +99,7 @@ defaultNadaState = NadaState {
 , _nextAvailableId = 0
 , _selectedTodoList = 0
 , _currentMode = ModeNormal
+, _allTags = []
 }
 
 -- Set the ID of a Todo, updating also the ID of the Editor inside
@@ -134,6 +137,32 @@ getAllTodoIds st = Map.keys (st ^. todosMap)
 
 addTodoListToState :: TodoList -> NadaState -> NadaState
 addTodoListToState tdl st = st & visibleTodoLists %~ (++ [tdl])
+
+getListIds :: [Todo] -> [Integer]
+getListIds []     = []
+getListIds (t:ts) = id : getListIds ts
+  where 
+    TodoId id = t ^. todoId
+
+completedTodos :: NadaState -> [Todo]
+completedTodos st = getCompleted (toList $ st ^. todosMap)
+
+activeTodos :: NadaState -> [Todo]
+activeTodos st = getActive (toList $ st ^. todosMap)
+
+getActive :: [Todo] -> [Todo] 
+getActive [] = []
+getActive l = Prelude.filter isActive l
+
+isActive :: Todo-> Bool
+isActive todo = not (todo ^. todoCompleted)
+
+getCompleted :: [Todo] -> [Todo] 
+getCompleted [] = []
+getCompleted l = Prelude.filter isCompleted l
+
+isCompleted :: Todo-> Bool
+isCompleted todo = todo ^. todoCompleted
 
 getSelectedTodoId :: NadaState -> Integer
 getSelectedTodoId st = selTodoId

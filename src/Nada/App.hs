@@ -8,14 +8,21 @@ import Nada.Types
 
 import qualified Data.Sequence as Seq
 import Data.List (intersperse)
-import Data.Text (Text, unlines, unwords, lines)
+import Data.Text 
+  ( Text
+  , unlines
+  , unwords
+  , lines
+  , pack
+  , unpack
+  )
 import Data.Text.Zipper (textZipper)
 import Data.Time
   ( formatTime
   , defaultTimeLocale
   )
 import Text.Wrap
-  (defaultWrapSettings
+  ( defaultWrapSettings
   , preserveIndentation
   , breakLongWords
   , wrapText
@@ -48,41 +55,71 @@ drawTodo iTodo jTodoList st =
   verticalB (thisTodo ^. todoPriority)
   <+>
   (padRight (Pad 1) (drawCompleted (thisTodo ^. todoCompleted))
-    -- below the context of the editor is rendered, but the cursor is not visible yet - to be fixed soon
-    -- if you want to see the cursor, but with no text rendering, uncomment the following
-    -- <+> renderWrappedTxt ((Data.Text.unlines (Ed.getEditContents _todoName)))  
     <+> drawName
     <=> tags
-    <=> dueDate
+    <=> (padBottom (Pad 1) dueDate)
     <=> drawDescription
+    <=> (padLeft (Pad 6) drawSubTasks)
   )
   where
-    thisTodoId = st ^?! visibleTodoLists.ix (fromInteger jTodoList).todoList.ix (fromInteger iTodo)
-    thisTodo = st ^?! todosMap.ix thisTodoId
-    thisTodoList = st ^?! visibleTodoLists.ix (fromInteger jTodoList)
+    thisTodoId     = st ^?! visibleTodoLists.ix (fromInteger jTodoList).todoList.ix (fromInteger iTodo)
+    thisTodo       = st ^?! todosMap.ix thisTodoId
+    thisTodoList   = st ^?! visibleTodoLists.ix (fromInteger jTodoList)
     listIsSelected = jTodoList == st ^. selectedTodoList
     isSelectedTodo = listIsSelected && iTodo == thisTodoList ^. selectedTodo
-    isEditingTodo = isSelectedTodo && (st ^. currentMode == ModeEdit)
+    isEditingTodo  = isSelectedTodo && (st ^. currentMode == ModeEdit)
     withStyle
-      | isEditingTodo = forceAttr editingAttr . visible
+      | isEditingTodo  = forceAttr editingAttr . visible
       | isSelectedTodo = forceAttr selectedAttr . visible
       | otherwise = id
 
     drawName = if isEditingTodo
-                  then Ed.renderEditor (txt . Data.Text.unlines) True (st ^. todoEditor)
-                  else renderWrappedTxt (thisTodo ^. todoName)
+               then Ed.renderEditor (txt . Data.Text.unlines) True (st ^. todoEditor)
+               else withAttr (attrName "todoname") $ renderWrappedTxt (thisTodo ^. todoName)
     drawCompleted True  = txt "[X]"
     drawCompleted False = txt "[ ]"
-    drawDescription = padLeft (Pad 6) $ renderWrappedTxt (thisTodo ^. todoDescription)
-    tags = padLeft (Pad 4) $ (renderWrappedTxt . Data.Text.unwords) (thisTodo ^. todoTags)
-    dueDate  = padLeft (Pad 4) $ hLimit 20 $ strWrapWith settings $
+    drawDescription = padLeft (Pad 4) $ renderWrappedTxt (thisTodo ^. todoDescription)
+    tags = padLeft (Pad 4) $ hBox $ fmap (drawTag st) (thisTodo ^. todoTags) 
+    dueDate  = padLeft (Pad 4) $ withAttr (attrName "deadline") $ hLimit 20 $ renderWrappedTxt $ pack $
       case thisTodo ^. todoDueDate of
         Nothing -> ""
         Just d  -> "Deadline: " <> formatTime defaultTimeLocale "%Y-%d-%m" d
+    drawSubTasks = vBox $ fmap (drawSubTodo st) $ thisTodo ^. todoSubTasks     
+
+drawTag :: NadaState -> Text -> Widget Name
+drawTag st tag = padRight (Pad 1)$
+  updateAttrMap (A.applyAttrMappings (createAttrNames $ st^.allTags)) $
+  withAttr (attrName $ unpack tag) 
+  $ renderWrappedTxt tag
+
+drawSubTodo :: NadaState -> Todo -> Widget Name
+drawSubTodo st todo = T.Widget T.Fixed T.Fixed $ 
+  do 
+    let nextId = st ^. nextAvailableId
+        st = st & nextAvailableId .~ nextId + 1
+    T.render $
+      -- viewport NadaVP nextId Both $
+      verticalB (todo ^. todoPriority)
+      <+>
+      (padRight (Pad 1) (drawCompleted (todo ^. todoCompleted))
+        <+> drawName
+        <=> tags
+        <=> dueDate
+        <=> drawDescription
+        <=> drawSubTasks
+      )
       where
-        settings = defaultWrapSettings { preserveIndentation = True
-                                       , breakLongWords = True
-                                       }
+        drawName = renderWrappedTxt (todo ^. todoName)
+        drawCompleted True  = txt "[X]"
+        drawCompleted False = txt "[ ]"
+        drawDescription = padLeft (Pad 6) $ renderWrappedTxt (todo ^. todoDescription)
+        tags = padLeft (Pad 4) $ (renderWrappedTxt . Data.Text.unwords) (todo ^. todoTags)
+        dueDate  = padLeft (Pad 4) $ hLimit 20 $ renderWrappedTxt $ pack $
+          case todo ^. todoDueDate of
+            Nothing -> ""
+            Just d  -> "Deadline: " <> formatTime defaultTimeLocale "%Y-%d-%m" d
+        drawSubTasks = vBox $ fmap (drawSubTodo st) $ todo ^. todoSubTasks
+
 
 renderWrappedTxt :: Text -> Widget Name
 renderWrappedTxt t = T.Widget T.Fixed T.Fixed
@@ -123,11 +160,7 @@ renderWrappedTxt t = T.Widget T.Fixed T.Fixed
 --      visibleRegion cursorLoc (atCharWidth, 1) $
 --      txt $ 
 --      "Running nada without any command should be thedd same as running nadaggg with the command editnnnnnnn" 
---     --  f (Data.Text.unlines (getText (Ed.getEditContents e))) 
-     
-
---       -- (txt . wrapText settings w ) (Data.Text.unlines $ Z.getText z)
---       where
+--     where
 --         -- f = txt . wrapText settings w 
 --         settings = defaultWrapSettings { preserveIndentation = True
 --                                        , breakLongWords = True
@@ -205,8 +238,8 @@ currentModeBar :: NadaState -> Widget Name
 currentModeBar st = str $ show $ st ^. currentMode
 
 -- Scroll functionality for Todo Viewport
-vp0Scroll :: M.ViewportScroll Name
-vp0Scroll = M.viewportScroll NadaVP
+-- vp0Scroll :: M.ViewportScroll Name
+-- vp0Scroll = M.viewportScroll NadaVP
 
 nadaAppDraw :: NadaState -> [Widget Name]
 nadaAppDraw st = [ui]
@@ -218,8 +251,8 @@ nadaAppDraw st = [ui]
 
 appEventNormal :: BrickEvent Name e -> EventM Name NadaState ()
 -- Scroll for Task Viewport
-appEventNormal (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1
-appEventNormal (MouseDown _ E.BScrollUp   _ _) = M.vScrollBy vp0Scroll (-1)
+-- appEventNormal (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1
+-- appEventNormal (MouseDown _ E.BScrollUp   _ _) = M.vScrollBy vp0Scroll (-1)
 -- Keyboard Shortcuts
 appEventNormal (VtyEvent vtyE) = case vtyE of
   V.EvKey (V.KChar 'q') [] -> do
@@ -300,20 +333,31 @@ selectedAttr = attrName "selected"
 editingAttr :: AttrName
 editingAttr = attrName "editing"
 
+createAttrNames :: [Text] -> [(AttrName, V.Attr)]
+createAttrNames tl = Prelude.zip names myAttrs
+  where
+    names = fmap (attrName . unpack) tl
+
+myAttrs :: [V.Attr]
+myAttrs = [ fg V.yellow
+          -- , fg V.magenta
+          -- , fg V.brightCyan
+          , fg V.brightRed
+          , fg V.brightGreen
+          , fg V.brightBlue
+          --   V.white  `on` V.green
+          -- , V.yellow `on` V.black
+          -- , V.white  `on` V.red
+          -- , V.white  `on` V.magenta
+          -- , V.white  `on` V.cyan
+          ]
+
 theMap :: AttrMap
 theMap = attrMap V.defAttr
     [ (selectedAttr, V.black `on` (V.rgbColor 253 253 150))
     , (editingAttr,  V.white `on` V.blue)
-    -- , (attrName "tag1", V.white `on` V.green)
-    -- , (attrName "tag2", V.white `on` V.green)
-    -- , (attrName "tag3", V.white `on` V.green)
-    -- , (attrName "tag4", V.white `on` V.green)
-    -- , (attrName "tag5", V.white `on` V.green)
-    -- , (attrName "tag6", V.white `on` V.green)
-    -- , (attrName "tag7", V.white `on` V.green)
-    -- , (attrName "tag8", V.white `on` V.green)
-    -- , (attrName "tag9", V.white `on` V.green)
-    -- , (attrName "tag10", V.white `on` V.green)
+    , (attrName "deadline",  V.withStyle (fg V.blue) V.italic)
+    , (attrName "todoname", V.withStyle (V.defAttr) V.bold)
     -- , (Ed.editAttr,                   V.white `on` V.blue)
     -- , (Ed.editFocusedAttr,            V.black `on` V.yellow)
     ]
