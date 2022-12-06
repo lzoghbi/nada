@@ -7,12 +7,14 @@
 
 
 * TODO [#B] Running nada without any command should be the same as running nada with the command edit
+  DEADLINE: <2022-12-04 Sun>
 
 
 * DONE [#B] Fix bug with spaces not being added when writing to output ( LOL)
 
 
 * TODO [#B] display warning when we don't completely read an input file
+  DEADLINE: <2022-12-04 Sun>
 
 
 * TODO [#C] anotherTask :home:school:work:

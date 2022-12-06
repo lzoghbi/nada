@@ -8,6 +8,7 @@ module Nada.Org
   ) where
 
 import Nada.Types
+import Nada.Calendar (makeCalendarStateForCurrentDay)
 
 import Data.Foldable (find, toList)
 import Data.List.NonEmpty (NonEmpty)
@@ -27,17 +28,21 @@ import Lens.Micro
 -- isn't relevant to Nada. In the future it might be nice to add a warning or
 -- error for what we aren't parsing.
 --
--- This conversion is hacky right now.
-orgFileToNada :: O.OrgFile -> NadaState
+-- This conversion is hacky right now and in IO to generate the calendar state
+-- (this is not strictly necessary - it might be worthwhile to make the calendar
+-- state a Maybe since it only needs to exist when we enter the Calendar edit mode).
+orgFileToNada :: O.OrgFile -> IO NadaState
 -- FIXME: We ignore O.docBlocks entirely and silently ignore any failures to
 -- convert a section to a 'Todo' (represented as 'orgSectionToNadaTodo'
 -- returning 'Nothing').
 -- Reserved 0 - 9 for other clickable widgets.
-orgFileToNada org = newState & (visibleTodoLists.ix 0.todoList) .~ Seq.fromList assignedIds
+orgFileToNada org = do 
+  calendarState <- makeCalendarStateForCurrentDay
+  let (newState, assignedIds) = addTodosToState (defaultNadaStateFromCalendarState calendarState) correctlyParsedTodos
+  pure (newState & (visibleTodoLists.ix 0.todoList) .~ Seq.fromList assignedIds)
   where
     docSections = O.docSections $ O.orgDoc org
     correctlyParsedTodos = catMaybes $ orgSectionToNadaTodo <$> zip [0..] docSections
-    (newState, assignedIds) = addTodosToState defaultNadaState correctlyParsedTodos
     
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
 orgSectionToNadaTodo (tdId, O.Section{..}) = do
@@ -73,7 +78,7 @@ orgSectionToNadaTodo (tdId, O.Section{..}) = do
     -- The more natural thing to do would be to just return the largest id from
     -- 'orgFileToNada'. Or eventually rework this function to make use of
     -- our function to create a new todo (once implemented).
-    , _todoId = TodoId tdId
+    , _todoId = mkTodoId tdId
     , _todoDueDate  = dueDate
     , _todoPriority = priority
     , _todoTags = sectionTags
