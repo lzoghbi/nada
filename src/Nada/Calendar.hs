@@ -4,10 +4,19 @@ module Nada.Calendar
   (
     drawCalendar
   , appEventCalendar
-  , testCalendarState
   , CalendarState(..)
   , WithCalendarName(..)
   , makeCalendarStateForCurrentDay
+  -- * Exposed for testing
+  , makeEmptyCalendarStateFromDay
+  , calendarBlockRange
+  , firstMondayBefore
+  , prevSelectedMonth
+  , nextSelectedMonth
+  , prevWeek
+  , nextWeek
+  , prevDay
+  , nextDay
   ) where
 
 import Brick
@@ -49,16 +58,14 @@ data CalendarState resourceName
   , calendarWidgets :: Map Day [Widget resourceName]
   }
 
-testCalendarState :: Name n => CS n
-testCalendarState = CalendarState day (dayPeriod day) mempty
-  where
-    day = YearMonthDay 2022 12 3
+makeEmptyCalendarStateFromDay :: Day -> CalendarState n
+makeEmptyCalendarStateFromDay day = CalendarState day (dayPeriod day) mempty
 
 makeCalendarStateForCurrentDay :: IO (CalendarState n)
 makeCalendarStateForCurrentDay = do
   now <- getZonedTime
   let day = localDay $ zonedTimeToLocalTime now
-  pure $ CalendarState day (dayPeriod day) mempty
+  pure $ makeEmptyCalendarStateFromDay day
  
 
 drawCalendar :: Name n => CS n -> W n

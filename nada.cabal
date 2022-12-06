@@ -86,6 +86,7 @@ test-suite nada-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Test.Nada.Calendar
       Paths_nada
   hs-source-dirs:
       test
@@ -104,6 +105,9 @@ test-suite nada-test
     , nada
     , optparse-applicative
     , org-mode
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
     , text
     , text-zipper
     , time >=1.12.2

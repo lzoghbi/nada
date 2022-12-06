@@ -76,3 +76,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - nada
+    - tasty
+    - tasty-hunit
+    - tasty-quickcheck
