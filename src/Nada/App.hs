@@ -244,6 +244,16 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
                                 let cs = freshCalendarState{calendarWidgets = addToCalendarWidgets todos}
                                 modify (calendarState .~ cs)
                                 modify (currentMode .~ ModeCalendar)
+  V.EvKey (V.KChar 'w') [] -> do
+                                st <- get
+                                let (st', newId) = addTodoToState st (defaultTodo 0)
+                                put st'
+                                let newList = defaultTodoList & todoListName .~ "More todos"
+                                                              & todoList .~ Seq.fromList [newId]
+                                visibleTodoLists %= (++ [newList])
+                                todoLists <- use visibleTodoLists
+                                let nTodoLists = length $ todoLists
+                                selectedTodoList .= toInteger nTodoLists - 1
   _ -> return ()
 appEventNormal _ = return ()
 
