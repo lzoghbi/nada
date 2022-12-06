@@ -19,6 +19,7 @@ import Text.Wrap
   , preserveIndentation
   , breakLongWords
   , wrapText
+  , wrapTextToLines
   )
 
 import Brick
@@ -32,6 +33,9 @@ import qualified Graphics.Vty as V
 import qualified Graphics.Vty.Input.Events as E
 
 import Control.Monad.State
+import qualified Data.Text.Zipper as Z hiding ( textZipper )
+import qualified Data.Text.Zipper.Generic as Z
+import qualified Data.Text.Zipper.Generic.Words as Z
 
 import Lens.Micro
 import Lens.Micro.Mtl
@@ -66,7 +70,7 @@ drawTodo iTodo jTodoList st =
 
     drawName = if isEditingTodo
                   then Ed.renderEditor (txt . Data.Text.unlines) True (st ^. todoEditor)
-                  else txt (thisTodo ^. todoName)
+                  else renderWrappedTxt (thisTodo ^. todoName)
     drawCompleted True  = txt "[X]"
     drawCompleted False = txt "[ ]"
     drawDescription = padLeft (Pad 6) $ renderWrappedTxt (thisTodo ^. todoDescription)
@@ -75,9 +79,10 @@ drawTodo iTodo jTodoList st =
       case thisTodo ^. todoDueDate of
         Nothing -> ""
         Just d  -> "Deadline: " <> formatTime defaultTimeLocale "%Y-%d-%m" d
-    settings = defaultWrapSettings { preserveIndentation = True
-                                   , breakLongWords = True
-                                   }
+      where
+        settings = defaultWrapSettings { preserveIndentation = True
+                                       , breakLongWords = True
+                                       }
 
 renderWrappedTxt :: Text -> Widget Name
 renderWrappedTxt t = T.Widget T.Fixed T.Fixed
@@ -90,6 +95,57 @@ renderWrappedTxt t = T.Widget T.Fixed T.Fixed
         settings = defaultWrapSettings { preserveIndentation = True
                                        , breakLongWords = True
                                        }
+
+
+-- renderEd :: (Ord n, Show n, Monoid t, TextWidth t, Z.GenericTextZipper t)
+--              => Bool -> Ed.Editor t n -> Widget n
+
+-- renderEd foc e = T.Widget T.Fixed T.Fixed 
+--   $ do
+--     c <- T.getContext 
+--     let w  = c^.T.availWidthL
+--         cp = Ed.getCursorPosition e
+--         z  = e^.Ed.editContentsL
+--         line = Z.currentLine z
+--         tw   = textWidth line
+--         lim = if (tw) > w  
+--               then tw `div` w + 1
+--               else 1  
+--         toLeft = Z.take (cp^._2) line
+--         cursorLoc = Location (textWidth toLeft, cp^._1)
+--         atChar = charAtCursor 10  (e^.Ed.editContentsL)
+--         atCharWidth = maybe 1 textWidth atChar
+--     T.render $ 
+--      vLimit lim $
+--      viewport (getName e) Both $
+--      withAttr (if foc then Ed.editFocusedAttr else Ed.editAttr) $      
+--      (if foc then showCursor (getName e) cursorLoc else id) $
+--      visibleRegion cursorLoc (atCharWidth, 1) $
+--      txt $ 
+--      "Running nada without any command should be thedd same as running nadaggg with the command editnnnnnnn" 
+--     --  f (Data.Text.unlines (getText (Ed.getEditContents e))) 
+     
+
+--       -- (txt . wrapText settings w ) (Data.Text.unlines $ Z.getText z)
+--       where
+--         -- f = txt . wrapText settings w 
+--         settings = defaultWrapSettings { preserveIndentation = True
+--                                        , breakLongWords = True
+--                                        }
+
+
+-- charAtCursor :: (Z.GenericTextZipper t) => Int -> Z.TextZipper t -> Maybe t
+-- charAtCursor maxW z =
+--     let col = snd $ Z.cursorPosition z
+--         curLine = Z.currentLine z
+--         toRight = Z.drop col curLine
+--         length  = Z.length toRight
+--     in if length > 0 
+--        then if length <= 5 
+--             then Just $ Z.take 1 toRight
+--             -- else curLine+1
+--             else Just $ Z.take 1 toRight
+--        else Nothing
 
 -- daysDiff:: Day -> IO Integer
 -- daysDiff day = do
@@ -248,6 +304,18 @@ theMap :: AttrMap
 theMap = attrMap V.defAttr
     [ (selectedAttr, V.black `on` (V.rgbColor 253 253 150))
     , (editingAttr,  V.white `on` V.blue)
+    -- , (attrName "tag1", V.white `on` V.green)
+    -- , (attrName "tag2", V.white `on` V.green)
+    -- , (attrName "tag3", V.white `on` V.green)
+    -- , (attrName "tag4", V.white `on` V.green)
+    -- , (attrName "tag5", V.white `on` V.green)
+    -- , (attrName "tag6", V.white `on` V.green)
+    -- , (attrName "tag7", V.white `on` V.green)
+    -- , (attrName "tag8", V.white `on` V.green)
+    -- , (attrName "tag9", V.white `on` V.green)
+    -- , (attrName "tag10", V.white `on` V.green)
+    -- , (Ed.editAttr,                   V.white `on` V.blue)
+    -- , (Ed.editFocusedAttr,            V.black `on` V.yellow)
     ]
 
 nadaApp :: App NadaState e Name
