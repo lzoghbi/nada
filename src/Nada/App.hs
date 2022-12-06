@@ -162,7 +162,7 @@ drawTodoList st jTodoList = T.Widget T.Greedy T.Greedy $
 
 -- Widget - Shortcut info
 shortcutInfoBar :: Widget Name
-shortcutInfoBar = renderWrappedTxt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d]: Delete task  [t]: Toggle [o]: Switch list [c]: Calendar view"
+shortcutInfoBar = renderWrappedTxt "[q]: Quit  [j/k]: Up/Down  [n]: New task  [d]: Delete task  [t]: Toggle  [w]: New list  [x]: Delete list  [o]: Switch list  [c]: Calendar view"
 
 currentModeBar :: NadaState -> Widget Name
 currentModeBar st = str $ show $ st ^. currentMode
@@ -250,10 +250,18 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
                                 put st'
                                 let newList = defaultTodoList & todoListName .~ "More todos"
                                                               & todoList .~ Seq.fromList [newId]
-                                visibleTodoLists %= (++ [newList])
+                                id %= addTodoListToState newList
                                 todoLists <- use visibleTodoLists
                                 let nTodoLists = length $ todoLists
                                 selectedTodoList .= toInteger nTodoLists - 1
+  V.EvKey (V.KChar 'x') [] -> do
+                                todoLists <- use visibleTodoLists
+                                sel <- use selectedTodoList
+                                let (l, r) = splitAt (fromInteger sel) todoLists
+                                let newTodoLists = l ++ tail r
+                                visibleTodoLists .= newTodoLists
+                                selectedTodoList %= max 0 . min (toInteger $ length newTodoLists - 1)
+                            
   _ -> return ()
 appEventNormal _ = return ()
 
