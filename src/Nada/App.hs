@@ -101,7 +101,7 @@ drawTodo iTodo jTodoList st =
     dueDate  = padLeft (Pad 5) $ withAttr (attrName "deadline") $ hLimit 20 $ renderWrappedTxt $ pack $
       case thisTodo ^. todoDueDate of
         Nothing -> ""
-        Just d  -> "Deadline: " <> formatTime defaultTimeLocale "%Y-%m-%m" d
+        Just d  -> "Deadline: " <> formatTime defaultTimeLocale "%Y-%m-%d" d
     drawSubTasks = vBox $ fmap (drawSubTodo st) $ thisTodo ^. todoSubTasks     
 
 drawTag :: NadaState -> Text -> Widget Name
