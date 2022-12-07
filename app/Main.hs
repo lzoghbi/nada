@@ -12,6 +12,7 @@ import Data.Text (Text, isInfixOf, splitOn, unpack)
 import qualified Data.Text.IO as Text
 import Data.Time (Day, defaultTimeLocale, parseTimeM)
 import Lens.Micro
+import Nada.Types hiding (Edit)
 import Nada.App
 import Nada.Org
 import Nada.Types
@@ -112,7 +113,7 @@ openNadaFile filePath = do
   -- We use the "raw" org file parsers because Data.Org does not expose a
   -- parser that gives information on why the parse failed.
   case parse O.orgFile filePath rawOrgFile of
-    Right orgFile -> return (orgFileToNada orgFile)
+    Right orgFile -> orgFileToNada orgFile
     Left parseError -> do
       putStrLn "Encountered an error trying to parse the org file:"
       putStrLn (errorBundlePretty parseError)
@@ -121,11 +122,16 @@ openNadaFile filePath = do
 edit :: FilePath -> Text -> IO ()
 edit filePath filterText = do
   nadaState <- openNadaFile filePath
-  let moreTodoList =
-        defaultTodoList
-          & todoListName .~ "More todos"
-          & todoList .~ Seq.fromList (getAllTodoIds nadaState)
-  let nadaState' = addTodoListToState moreTodoList nadaState
+  let moreTodoList = defaultTodoList & todoListName .~ "More todos"
+                                     & todoList .~ Seq.fromList (getAllTodoIds nadaState)
+  -- let completedList = defaultTodoList & todoListName .~ "Completed"
+  --                                     & todoList .~ Seq.fromList (getListIds $ completedTodos nadaState)
+  
+  -- let activeList = defaultTodoList & todoListName .~ "Active"
+  --                                     & todoList .~ Seq.fromList (getListIds $ activeTodos nadaState)
+
+  let nadaState'  = addTodoListToState moreTodoList nadaState
+  -- let nadaState'' = addTodoListToState activeList nadaState'
   -- Ignoring the filter text for now
   -- finalNadaState <- Brick.defaultMain nadaApp nadaState{_filterText = filterText}
   finalNadaState <- Brick.defaultMain nadaApp nadaState'
@@ -157,12 +163,12 @@ add _ _ _ _ _ _ = return ()
 --   nadaState <- openNadaFile filePath
 --   -- FIXME: Write a helper function for this
 --   let newIntId = toInteger $ Seq.length (_todoList nadaState) + 1
---   let newTodo = Todo
---               { _todoName = Ed.editorText (EditorId newIntId) Nothing todo
+--   let newTodo = Todo 
+--               { _todoName = Ed.editorText (mkTodoEditor) Nothing todo
 --               , _todoDescription = fromMaybe "" todoDesc
 --               , _todoCompleted = False
 --               -- FIXME: Use proper id generation
---               , _todoId = TodoId newIntId
+--               , _todoId = mkTodoId newIntId
 --               , _todoDueDate  = toNadaDeadline date
 --               , _todoPriority = toNadaPriority todoPrio
 --               , _todoTags     = toNadaTags tags

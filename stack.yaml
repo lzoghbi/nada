@@ -17,8 +17,8 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/32.yaml
+resolver: lts-20.0
+#  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/32.yaml
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -41,9 +41,11 @@ extra-deps:
 - text-zipper-0.12@sha256:e96110598fc25e57a99ffcd8e583351af8b325b813aa5e3bd0adc627e3e02b6b,1472
 - vty-5.37@sha256:416ba9007f6b64226ad68bfd7a227714082832d004e07567e9850a7cec67d77a,20859
 - org-mode-2.0.2@sha256:2094c2a173aae097bf6500cb8f6499f710308ac715c37cdb88587a9065960b58,1452
-- fourmolu-0.9.0.0@sha256:0591609a168fe2839ebb2d02a2300626b6178a8924ea184e49eae4f571b27241,7732
-- Cabal-3.6.3.0@sha256:ff97c442b0c679c1c9876acd15f73ac4f602b973c45bde42b43ec28265ee48f4,12459
-- ghc-lib-parser-9.2.5.20221107@sha256:462cba52f8ad68c7de99e72e3d8e65bec41c8234de37dd68e0c676f3bac32888,12741
+- time-1.12.2@sha256:88e8493d9130038d3b9968a2530a0900141cd3d938483c83dde56e12b875ebc8,6510
+- directory-1.3.8.0@sha256:89f3645066c8a1456d237adcbc955c668abe7beca3ccc61a5843b3c4fbf426c6,2878
+- process-1.6.16.0@sha256:1b9c267e475d4492b80edc1f58d08c458d4a10d17ea95294356443855b125616,2845
+- filepath-1.4.100.0@sha256:45a49fc8c379b33fdba3c8cc96dcf22b15c50995d0f4b8638e9b6b9423d1b877,5875
+- unix-2.8.0.0@sha256:5e4626217ca5b00e0589e09f491c6448289b625d99bb132a112d8c3dc724d8ce,6856
 # - acme-missiles-0.3
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
