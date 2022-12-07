@@ -1,26 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+
 module Main (main) where
 
 import qualified Brick
 import qualified Brick.Widgets.Edit as Ed
+import Data.Maybe (fromMaybe)
+import qualified Data.Org as O
+import qualified Data.Sequence as Seq
+import Data.Text (Text, isInfixOf, splitOn, unpack)
+import qualified Data.Text.IO as Text
+import Data.Time (Day, defaultTimeLocale, parseTimeM)
+import Lens.Micro
 import Nada.Types hiding (Edit)
 import Nada.App
 import Nada.Org
-import Data.Text (Text, unpack, splitOn, isInfixOf)
-import qualified Data.Text.IO as Text
-import qualified Data.Org as O
+import Nada.Types
 import Options.Applicative
 import System.Environment (lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
-import qualified Data.Sequence as Seq
-import Data.Maybe (fromMaybe)
-import Data.Time (Day, parseTimeM, defaultTimeLocale)
-import Lens.Micro
 
 -- For getting the error message when parsing the org file
-import Text.Megaparsec (parse, errorBundlePretty)
-
+import Text.Megaparsec (errorBundlePretty, parse)
 
 data Command
   = Add Text (Maybe Text) (Maybe Text) (Maybe Text) (Maybe Text)
@@ -28,71 +29,83 @@ data Command
   | Complete Text
 
 commandParser :: Parser Command
-commandParser = subparser
-  (  command "add" (info addCommand (progDesc "Add a todo to the list"))
-  <> command "edit" (info editCommand (progDesc "Open a TUI to edit the list"))
-  <> command "complete" (info completeCommand (progDesc "Mark a todo as complete"))
-  )
+commandParser =
+  subparser
+    ( command "add" (info addCommand (progDesc "Add a todo to the list"))
+        <> command "edit" (info editCommand (progDesc "Open a TUI to edit the list"))
+        <> command "complete" (info completeCommand (progDesc "Mark a todo as complete"))
+    )
   where
-    addCommand = Add
-      <$> strArgument
-          (  metavar "TODO"
-          <> help "Todo to add to the list"
+    addCommand =
+      Add
+        <$> strArgument
+          ( metavar "TODO"
+              <> help "Todo to add to the list"
           )
-      <*> argument (Just <$> str)
-          (  metavar "DUE DATE"
-          <> value Nothing
-          <> help "(Optional) Due date for the todo"
-          )  
-      <*> argument (Just <$> str)
-          (  metavar "PRIORITY"
-          <> value Nothing
-          <> help "(Optional) Priority for the todo [high/medium/low]"
-          ) 
-      <*> argument (Just <$> str)
-          (  metavar "TAG"
-          <> value Nothing
-          <> help "(Optional) One or more tags for the todo"
-          )         
-      <*> argument (Just <$> str)
-          (  metavar "DESC"
-          <> value Nothing
-          <> help "(Optional) Description for the todo"
-          )             
-      <**> helper
-    editCommand = Edit 
-      <$> strOption
-          (  long "query"
-          <> short 'q'
-          <> metavar "QUERY"
-          <> value ""
-          <> help "Query used to filter shown todos"
+        <*> argument
+          (Just <$> str)
+          ( metavar "DUE DATE"
+              <> value Nothing
+              <> help "(Optional) Due date for the todo"
           )
-      <**> helper
-    completeCommand = Complete
-      <$> strArgument
-          (  metavar "TODO"
-          <> help "Todo to complete"
+        <*> argument
+          (Just <$> str)
+          ( metavar "PRIORITY"
+              <> value Nothing
+              <> help "(Optional) Priority for the todo [high/medium/low]"
           )
-      <**> helper
+        <*> argument
+          (Just <$> str)
+          ( metavar "TAG"
+              <> value Nothing
+              <> help "(Optional) One or more tags for the todo"
+          )
+        <*> argument
+          (Just <$> str)
+          ( metavar "DESC"
+              <> value Nothing
+              <> help "(Optional) Description for the todo"
+          )
+        <**> helper
+    editCommand =
+      Edit
+        <$> strOption
+          ( long "query"
+              <> short 'q'
+              <> metavar "QUERY"
+              <> value ""
+              <> help "Query used to filter shown todos"
+          )
+        <**> helper
+    completeCommand =
+      Complete
+        <$> strArgument
+          ( metavar "TODO"
+              <> help "Todo to complete"
+          )
+        <**> helper
 
 argParser :: Parser (Maybe FilePath, Command)
-argParser = (,)
-  <$> option (Just <$> str)
-      (  long "file"
-      <> short 'f'
-      <> metavar "FILE"
-      <> value Nothing
-      <> help "File containing a todo list; uses environmental variable NADA_FILE if not specified"
+argParser =
+  (,)
+    <$> option
+      (Just <$> str)
+      ( long "file"
+          <> short 'f'
+          <> metavar "FILE"
+          <> value Nothing
+          <> help "File containing a todo list; uses environmental variable NADA_FILE if not specified"
       )
-  <*> commandParser
+    <*> commandParser
 
 opts :: ParserInfo (Maybe FilePath, Command)
-opts = info (argParser <**> helper)
-  (  fullDesc
-  <> progDesc "Edit a todo list"
-  <> header "nada - A TUI-based todo list"
-  )
+opts =
+  info
+    (argParser <**> helper)
+    ( fullDesc
+        <> progDesc "Edit a todo list"
+        <> header "nada - A TUI-based todo list"
+    )
 
 openNadaFile :: FilePath -> IO NadaState
 openNadaFile filePath = do
@@ -128,22 +141,23 @@ edit filePath filterText = do
 toNadaDeadline :: Maybe Text -> Maybe Day
 -- TODO: error handling when input is wrong - currently it returns `Nothing`
 -- Dates need to have 2 digits for days/months
-toNadaDeadline (Just d) = parseTimeM True defaultTimeLocale "%Y-%-d-%-m" $ unpack d
-toNadaDeadline _        = Nothing
+toNadaDeadline (Just d) = parseTimeM True defaultTimeLocale "%Y-%-m-%-d" $ unpack d
+toNadaDeadline _ = Nothing
 
 toNadaPriority :: Maybe Text -> NadaPriority
 toNadaPriority (Just p) = case p of
-                            "high"   -> High
-                            "medium" -> Medium
-                            "low"    -> Low
-toNadaPriority _        = Medium
+  "high" -> High
+  "medium" -> Medium
+  "low" -> Low
+toNadaPriority _ = Medium
 
 toNadaTags :: Maybe Text -> [Text]
-toNadaTags Nothing  = []
+toNadaTags Nothing = []
 toNadaTags (Just t) = splitOn "," t
 
 add :: FilePath -> Text -> Maybe Text -> Maybe Text -> Maybe Text -> Maybe Text -> IO ()
 add _ _ _ _ _ _ = return ()
+
 -- ---------------- RECOVER FROM HERE -----------------------
 -- add filePath todo date todoPrio tags todoDesc = do
 --   nadaState <- openNadaFile filePath
@@ -158,14 +172,15 @@ add _ _ _ _ _ _ = return ()
 --               , _todoDueDate  = toNadaDeadline date
 --               , _todoPriority = toNadaPriority todoPrio
 --               , _todoTags     = toNadaTags tags
---               }            
---       finalNadaState = nadaState{ _todoList = _todoList nadaState Seq.:|> newTodo } 
+--               }
+--       finalNadaState = nadaState{ _todoList = _todoList nadaState Seq.:|> newTodo }
 --   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
 --   exitSuccess
 -- -------------------- TO HERE ------------------------------
 
 complete :: FilePath -> Text -> IO ()
 complete _ _ = return ()
+
 -- -------------------- RECOVER FROM HERE -------------------------
 -- complete filePath queryText = do
 --   nadaState <- openNadaFile filePath
@@ -192,10 +207,10 @@ main = do
   (argNadaFile, comm) <- execParser opts
   let maybeNadaFile = argNadaFile <|> defaultNadaFile
   case (maybeNadaFile, comm) of
-    (Nothing, _) -> do 
+    (Nothing, _) -> do
       putStrLn "No file specified, please specify a file using --file or the environmental variable NADA_FILE. For more information run"
       putStrLn "  nada --help"
       exitFailure
     (Just nadaFile, Edit filterText) -> edit nadaFile filterText
-    (Just nadaFile, Add todo date todoPrio tags todoDesc) -> add nadaFile todo date todoPrio tags todoDesc 
+    (Just nadaFile, Add todo date todoPrio tags todoDesc) -> add nadaFile todo date todoPrio tags todoDesc
     (Just nadaFile, Complete queryText) -> complete nadaFile queryText

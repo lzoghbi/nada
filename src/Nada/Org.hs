@@ -1,15 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module Nada.Org
-  ( -- * Reading
-    orgFileToNada
-    -- * Writing
-  , nadaToOrgFile
-  ) where
+
+module Nada.Org (
+  -- * Reading
+  orgFileToNada,
+
+  -- * Writing
+  nadaToOrgFile,
+) where
 
 import Nada.Types
 import Nada.Calendar (makeCalendarStateForCurrentDay)
 
+import Brick.Widgets.Edit as Ed
 import Data.Foldable (find, toList)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
@@ -20,7 +23,6 @@ import Data.Text (Text)
 import Data.Set (toList)
 import qualified Data.Text as T
 import Data.Time (Day, dayOfWeek)
-import Brick.Widgets.Edit as Ed
 import Lens.Micro
 
 -- | Converts an 'OrgFile' to a 'NadaState'
@@ -56,7 +58,7 @@ orgSectionToNadaTodo (tdId, O.Section{..}) = do
   --
   -- Even if we demand that each section have a todo, we could change the return
   -- type to 'Either ParseError Todo' and create a new 'ParseError' datatype
-  -- representing a parse error.  
+  -- representing a parse error.
   todo <- orgTodoToNadaCompleted <$> sectionTodo
   let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
@@ -91,7 +93,7 @@ orgSectionToNadaTodo (tdId, O.Section{..}) = do
     }
 
 findDueDate :: Maybe O.OrgDateTime -> Maybe Day
-findDueDate (Just O.OrgDateTime{..}) = Just dateDay  
+findDueDate (Just O.OrgDateTime{..}) = Just dateDay
 findDueDate _ = Nothing
 
 findDescription :: O.OrgDoc -> Maybe Text
@@ -112,7 +114,7 @@ orgWordsToText :: NonEmpty O.Words -> Text
 -- FIXME: This is a hack to convert Data.Org's 'Words' into a 'Text'.
 -- Eventually if we support rendering italics, underlines, etc. we should
 -- convert this properly.
-orgWordsToText = T.intercalate " " . NE.toList . NE.map O.prettyWords 
+orgWordsToText = T.intercalate " " . NE.toList . NE.map O.prettyWords
 
 isParagraph :: O.Block -> Bool
 isParagraph (O.Paragraph _) = True
@@ -120,28 +122,31 @@ isParagraph _ = False
 
 nadaCompletedToOrgTodo :: Bool -> O.Todo
 nadaCompletedToOrgTodo False = O.TODO
-nadaCompletedToOrgTodo True  = O.DONE
+nadaCompletedToOrgTodo True = O.DONE
 
 orgTodoToNadaCompleted :: O.Todo -> Bool
 orgTodoToNadaCompleted O.TODO = False
 orgTodoToNadaCompleted O.DONE = True
 
 todoDeadline :: Maybe Day -> Maybe O.OrgDateTime
-todoDeadline (Just day) = Just ( O.OrgDateTime
-  { O.dateDay = day
-  , O.dateDayOfWeek = dayOfWeek day
-  , O.dateTime = Nothing
-  , O.dateRepeat = Nothing
-  , O.dateDelay = Nothing
-  })
+todoDeadline (Just day) =
+  Just
+    ( O.OrgDateTime
+        { O.dateDay = day
+        , O.dateDayOfWeek = dayOfWeek day
+        , O.dateTime = Nothing
+        , O.dateRepeat = Nothing
+        , O.dateDelay = Nothing
+        }
+    )
 todoDeadline _ = Nothing
 
 orgPrioToNadaPrio :: Maybe O.Priority -> NadaPriority
 orgPrioToNadaPrio (Just O.Priority{..}) = case priority of
-                                            "A" -> High
-                                            "B" -> Medium
-                                            "C" -> Low
-orgPrioToNadaPrio _                     = Medium
+  "A" -> High
+  "B" -> Medium
+  "C" -> Low
+orgPrioToNadaPrio _ = Medium
 
 nadaPrioToOrgPrio :: NadaPriority -> O.Priority
 nadaPrioToOrgPrio High   = O.Priority { priority = "A" }

@@ -1,13 +1,15 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 module Nada.Types where
 
+import Data.Foldable (toList)
+import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import Data.Text
-import Data.Time (Day)
-import qualified Data.Map as Map
-import Data.Foldable (toList)
+import Data.Time (Day, showGregorian)
+import Data.Time.Clock.System (systemEpochDay)
 
 import qualified Brick.Widgets.Edit as Ed
 
@@ -38,10 +40,10 @@ data NadaPriority = High
                   | Low 
    deriving (Eq, Show)
 
-data NadaMode = ModeNormal | ModeEdit | ModeCalendar
+data NadaMode = ModeNormal | ModeEdit | ModeEditTag | ModeEditDeadline | ModeCalendar
   deriving (Eq, Show)
 
-data Todo = Todo 
+data Todo = Todo
   { _todoName :: Text
   , _todoDescription :: Text
   , _todoCompleted :: Bool
@@ -55,13 +57,11 @@ data Todo = Todo
 
 data TodoList = TodoList
   { _todoListName :: Text
-  
-  -- _todoList are the IDs of the Todos in the list
-  , _todoList :: Seq.Seq Integer
-  
-  -- The index in the list of the currently selected Todo
-  -- This is NOT the global ID of the Todo
-  , _selectedTodo :: Integer
+  , -- _todoList are the IDs of the Todos in the list
+    _todoList :: Seq.Seq Integer
+  , -- The index in the list of the currently selected Todo
+    -- This is NOT the global ID of the Todo
+    _selectedTodo :: Integer
   }
   deriving (Show)
 
@@ -97,11 +97,12 @@ defaultTodo intId = Todo {
 }
 
 defaultTodoList :: TodoList
-defaultTodoList = TodoList {
-  _todoListName = "Todos"
-, _todoList = Seq.empty
-, _selectedTodo = 0
-}
+defaultTodoList =
+  TodoList
+    { _todoListName = "Todos"
+    , _todoList = Seq.empty
+    , _selectedTodo = 0
+    }
 
 defaultNadaStateFromCalendarState :: CalendarState Name -> NadaState
 defaultNadaStateFromCalendarState calendarState = NadaState {
@@ -125,8 +126,10 @@ setTodoId newId td = td & todoId .~ mkTodoId newId
 addTodoToState :: NadaState -> Todo -> (NadaState, Integer)
 addTodoToState st td = (newSt, thisId)
   where
-    newSt = st & nextAvailableId .~ thisId + 1
-               & todosMap %~ Map.insert thisId updatedTodo
+    newSt =
+      st
+        & nextAvailableId .~ thisId + 1
+        & todosMap %~ Map.insert thisId updatedTodo
     updatedTodo = setTodoId thisId td
     thisId = st ^. nextAvailableId
 
@@ -134,17 +137,17 @@ addTodoToState st td = (newSt, thisId)
 -- assigned
 addTodosToState :: NadaState -> [Todo] -> (NadaState, [Integer])
 addTodosToState st [] = (st, [])
-addTodosToState st (td:tds) = (st', nextId:ids)
+addTodosToState st (td : tds) = (st', nextId : ids)
   where
     (nextSt, nextId) = addTodoToState st td
     (st', ids) = addTodosToState nextSt tds
 
 getTodosFromIdxList :: NadaState -> [Integer] -> [Todo]
-getTodosFromIdxList st idxs = Prelude.map ((st^.todosMap) Map.!) idxs
+getTodosFromIdxList st idxs = Prelude.map ((st ^. todosMap) Map.!) idxs
 
 -- Get the actual list of Todos for the List at the specified index
 getActualTodoList :: NadaState -> Integer -> [Todo]
-getActualTodoList st i = getTodosFromIdxList st $ toList (st ^. (visibleTodoLists.ix (fromInteger i).todoList))
+getActualTodoList st i = getTodosFromIdxList st $ toList (st ^. (visibleTodoLists . ix (fromInteger i) . todoList))
 
 getAllTodoIds :: NadaState -> [Integer]
 getAllTodoIds st = Map.keys (st ^. todosMap)
@@ -181,7 +184,14 @@ isCompleted todo = todo ^. todoCompleted
 getSelectedTodoId :: NadaState -> Integer
 getSelectedTodoId st = selTodoId
   where
-    selTodoId = st ^?! (selTodoList.todoList.ix (fromInteger selTodoPos))
-    selTodoPos = st ^?! selTodoList.selectedTodo
-    selTodoList = visibleTodoLists.ix (fromInteger selTodoListPos)
+    selTodoId = st ^?! (selTodoList . todoList . ix (fromInteger selTodoPos))
+    selTodoPos = st ^?! selTodoList . selectedTodo
+    selTodoList = visibleTodoLists . ix (fromInteger selTodoListPos)
     selTodoListPos = st ^. selectedTodoList
+
+showDate :: Maybe Day -> [Text]
+showDate (Just a) = [Data.Text.pack $ showGregorian a]
+showDate Nothing  = [Data.Text.pack $ showGregorian systemEpochDay]
+
+
+

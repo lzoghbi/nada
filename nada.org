@@ -1,6 +1,7 @@
 
 
-* TODO [#B] Add proper state tracking.
+* TODO [#B] Add proper state tracking. :asdf:
+  DEADLINE: <2022-12-31 Sat>
 
 
 * DONE [#B] Add/edit files via CLI
