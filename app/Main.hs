@@ -111,10 +111,17 @@ edit filePath filterText = do
   nadaState <- openNadaFile filePath
   let moreTodoList = defaultTodoList & todoListName .~ "More todos"
                                      & todoList .~ Seq.fromList (getAllTodoIds nadaState)
-  let nadaState' = addTodoListToState moreTodoList nadaState
+  let completedList = defaultTodoList & todoListName .~ "Completed"
+                                      & todoList .~ Seq.fromList (getListIds $ completedTodos nadaState)
+  
+  let activeList = defaultTodoList & todoListName .~ "Active"
+                                      & todoList .~ Seq.fromList (getListIds $ activeTodos nadaState)
+
+  let nadaState'  = addTodoListToState completedList nadaState
+  let nadaState'' = addTodoListToState activeList nadaState'
   -- Ignoring the filter text for now
   -- finalNadaState <- Brick.defaultMain nadaApp nadaState{_filterText = filterText}
-  finalNadaState <- Brick.defaultMain nadaApp nadaState'
+  finalNadaState <- Brick.defaultMain nadaApp nadaState''
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 

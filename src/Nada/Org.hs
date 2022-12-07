@@ -17,6 +17,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Org as O
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
+import Data.Set (toList)
 import qualified Data.Text as T
 import Data.Time (Day, dayOfWeek)
 import Brick.Widgets.Edit as Ed
@@ -39,8 +40,10 @@ orgFileToNada :: O.OrgFile -> IO NadaState
 orgFileToNada org = do 
   calendarState <- makeCalendarStateForCurrentDay
   let (newState, assignedIds) = addTodosToState (defaultNadaStateFromCalendarState calendarState) correctlyParsedTodos
-  pure (newState & (visibleTodoLists.ix 0.todoList) .~ Seq.fromList assignedIds)
+  pure (newState & (visibleTodoLists.ix 0.todoList) .~ Seq.fromList assignedIds
+                 & allTags .~ Data.Set.toList tags)
   where
+    tags = O.allDocTags $ O.orgDoc org
     docSections = O.docSections $ O.orgDoc org
     correctlyParsedTodos = catMaybes $ orgSectionToNadaTodo <$> zip [0..] docSections
     
@@ -58,7 +61,8 @@ orgSectionToNadaTodo (tdId, O.Section{..}) = do
   let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
       dueDate  = findDueDate sectionDeadline
-      priority = orgPrioToNadaPrio sectionPriority      
+      priority = orgPrioToNadaPrio sectionPriority  
+      subTasks = findSubSections sectionDoc   
   pure $ Todo
     { _todoName = name
     -- FIXME: We might want to change the 'Todo' datatype to have
@@ -82,6 +86,8 @@ orgSectionToNadaTodo (tdId, O.Section{..}) = do
     , _todoDueDate  = dueDate
     , _todoPriority = priority
     , _todoTags = sectionTags
+    , _todoSubTasks = subTasks
+
     }
 
 findDueDate :: Maybe O.OrgDateTime -> Maybe Day
@@ -96,6 +102,12 @@ findDescription O.OrgDoc{..} = do
   O.Paragraph descWords <- find isParagraph docBlocks
   pure (orgWordsToText descWords)
 
+findSubSections :: O.OrgDoc -> [Todo]
+findSubSections O.OrgDoc{..} = 
+  if null docSections 
+  then []
+  else catMaybes $ orgSectionToNadaTodo <$> zip [100..] docSections
+  
 orgWordsToText :: NonEmpty O.Words -> Text
 -- FIXME: This is a hack to convert Data.Org's 'Words' into a 'Text'.
 -- Eventually if we support rendering italics, underlines, etc. we should
@@ -136,13 +148,17 @@ nadaPrioToOrgPrio High   = O.Priority { priority = "A" }
 nadaPrioToOrgPrio Medium = O.Priority { priority = "B" }
 nadaPrioToOrgPrio Low    = O.Priority { priority = "C" }
 
+nadaSubTasksToOrgSection :: [Todo] -> [O.Section]
+nadaSubTasksToOrgSection [] = []
+nadaSubTasksToOrgSection (t:ts) = (nadaTodoToOrgSection t : nadaSubTasksToOrgSection ts)
+
 -- | Represents a 'Todo' as a 'Section'
 --
 -- A 'Todo' always has a checkbox component and heading. Inside of the section
 -- we render the description as a paragraph of plaintext.
 nadaTodoToOrgSection :: Todo -> O.Section
 nadaTodoToOrgSection Todo{..} = O.Section
-  { sectionTodo = Just (nadaCompletedToOrgTodo _todoCompleted)
+  { sectionTodo     = Just (nadaCompletedToOrgTodo _todoCompleted)
   , sectionPriority = Just (nadaPrioToOrgPrio _todoPriority)
   -- FIXME: Eventually we may wish to support more than plaintext todos. We
   -- might do this by changing the type of 'todoName' to 'Data.Org.Words'.
@@ -150,14 +166,17 @@ nadaTodoToOrgSection Todo{..} = O.Section
   -- which leads to errors in the section fields below (everythng after a new line
   -- is parsed as sectionDoc)
   , sectionHeading = NE.singleton (O.Plain _todoName)
-  , sectionTags = _todoTags
-  , sectionClosed = Nothing
-  , sectionDeadline = todoDeadline _todoDueDate
+  , sectionTags    = _todoTags
+  , sectionClosed  = Nothing
+  , sectionDeadline  = todoDeadline _todoDueDate
   , sectionScheduled = Nothing
   , sectionTimestamp = Nothing
   , sectionProps = mempty
   -- FIXME: Eventually we will likely have a more complex section contents.
-  , sectionDoc = O.emptyDoc{O.docBlocks = [O.Paragraph $ NE.singleton (O.Plain _todoDescription)]}
+  , sectionDoc = O.emptyDoc
+    { O.docBlocks   = [O.Paragraph $ NE.singleton (O.Plain _todoDescription)]
+    , O.docSections = nadaSubTasksToOrgSection _todoSubTasks
+    }
   }
 
 nadaToOrgFile :: NadaState -> O.OrgFile
@@ -165,4 +184,4 @@ nadaToOrgFile :: NadaState -> O.OrgFile
 nadaToOrgFile st = O.emptyOrgFile{O.orgDoc = O.emptyDoc{O.docSections = sections}}
   where
     -- FIXME: This will only save the FIRST TodoList 
-    sections = toList (nadaTodoToOrgSection <$> getActualTodoList st 0)
+    sections = Data.Foldable.toList (nadaTodoToOrgSection <$> getActualTodoList st 0)

@@ -10,12 +10,13 @@
   DEADLINE: <2022-12-04 Sun>
 
 
-* DONE [#B] Fix bug with spaces not being added when writing to output ( LOL)
+** TODO [#B] Test anotherTask :home:school:
+   DEADLINE: <2022-12-31 Sat>
 
 
 * TODO [#B] display warning when we don't completely read an input file
   DEADLINE: <2022-12-04 Sun>
 
 
-* TODO [#C] anotherTask :home:school:work:
-  DEADLINE: <2022-12-31 Sat>
+* TODO [#C] task :leisure:
+DONE [#B] Testing. : home:leisure:
