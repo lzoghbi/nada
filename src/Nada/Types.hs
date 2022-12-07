@@ -154,9 +154,9 @@ addTodoListToState tdl st = st & visibleTodoLists %~ (++ [tdl])
 
 getListIds :: [Todo] -> [Integer]
 getListIds []     = []
-getListIds (t:ts) = id : getListIds ts
-  where 
-    TodoId id = t ^. todoId
+-- getListIds (t:ts) = id : getListIds ts
+--   where 
+--     TodoId id = t ^. todoId
 
 completedTodos :: NadaState -> [Todo]
 completedTodos st = getCompleted (toList $ st ^. todosMap)

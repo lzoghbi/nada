@@ -8,7 +8,7 @@ import Nada.Types
 import Nada.Calendar
 
 import Data.List (intersperse)
-import Data.Text (Text, pack, unlines, unwords, lines, isInfixOf)
+import Data.Text (Text, pack, unpack, unlines, unwords, lines, isInfixOf)
 import Data.Text.Zipper (textZipper)
 import Data.Time
   ( formatTime
@@ -62,33 +62,9 @@ drawTodoBare iTodo jTodoList st =
 
     drawName = if isEditingTodo
                   then Ed.renderEditor (txt . Data.Text.unlines) True (st ^. todoEditor)
-                  else txt (thisTodo ^. todoName)
-    drawCompleted True  = txt "[X]"
-    drawCompleted False = txt "[ ]"
-
--- drawTodo i j st draws the i-th Todo of the j-th TodoList in st
-drawTodo :: Integer -> Integer -> NadaState -> Widget Name
-drawTodo iTodo jTodoList st =
-  withStyle $
-    drawTodoBare iTodo jTodoList st  
-    <=> tags
-    <=> (padBottom (Pad 1) dueDate)
-    <=> drawDescription
-    <=> (padLeft (Pad 6) drawSubTasks)
-  )
-  where
-    thisTodoId     = st ^?! visibleTodoLists.ix (fromInteger jTodoList).todoList.ix (fromInteger iTodo)
-    thisTodo       = st ^?! todosMap.ix thisTodoId
-    thisTodoList   = st ^?! visibleTodoLists.ix (fromInteger jTodoList)
-    listIsSelected = jTodoList == st ^. selectedTodoList
-    isSelectedTodo = listIsSelected && iTodo == thisTodoList ^. selectedTodo
-    isEditingTodo = isSelectedTodo && (st ^. currentMode == ModeEdit)
-
-    drawName = if isEditingTodo
-                  then Ed.renderEditor (txt . Data.Text.unlines) True (st ^. todoEditor)
-                  else txt (thisTodo ^. todoName)
-    drawCompleted True  = txt "[X]"
-    drawCompleted False = txt "[ ]"
+                  else renderWrappedTxt (thisTodo ^. todoName)
+    drawCompleted True  = renderWrappedTxt "[X]"
+    drawCompleted False = renderWrappedTxt "[ ]"
 
 -- drawTodo i j st draws the i-th Todo of the j-th TodoList in st
 drawTodo :: Integer -> Integer -> NadaState -> Widget Name
@@ -98,7 +74,6 @@ drawTodo iTodo jTodoList st =
     <=> tags
     <=> (padBottom (Pad 1) dueDate)
     <=> drawDescription
-  )
   where
     thisTodoId     = st ^?! visibleTodoLists.ix (fromInteger jTodoList).todoList.ix (fromInteger iTodo)
     thisTodo       = st ^?! todosMap.ix thisTodoId
@@ -117,8 +92,8 @@ drawTodo iTodo jTodoList st =
     drawCompleted True  = txt "[X]"
     drawCompleted False = txt "[ ]"
     drawDescription = padLeft (Pad 4) $ renderWrappedTxt (thisTodo ^. todoDescription)
-    tags = padLeft (Pad 4) $ hBox $ fmap (drawTag st) (thisTodo ^. todoTags) 
-    dueDate  = padLeft (Pad 4) $ withAttr (attrName "deadline") $ hLimit 20 $ renderWrappedTxt $ pack $
+    tags = padLeft (Pad 5) $ hBox $ fmap (drawTag st) (thisTodo ^. todoTags) 
+    dueDate  = padLeft (Pad 5) $ withAttr (attrName "deadline") $ hLimit 20 $ renderWrappedTxt $ pack $
       case thisTodo ^. todoDueDate of
         Nothing -> ""
         Just d  -> "Deadline: " <> formatTime defaultTimeLocale "%Y-%d-%m" d
@@ -144,15 +119,15 @@ drawSubTodo st todo = T.Widget T.Fixed T.Fixed $
         <=> tags
         <=> dueDate
         <=> drawDescription
-        <=> drawSubTasks
+        -- <=> drawSubTasks
       )
       where
         drawName = renderWrappedTxt (todo ^. todoName)
         drawCompleted True  = txt "[X]"
         drawCompleted False = txt "[ ]"
         drawDescription = padLeft (Pad 6) $ renderWrappedTxt (todo ^. todoDescription)
-        tags = padLeft (Pad 4) $ (renderWrappedTxt . Data.Text.unwords) (todo ^. todoTags)
-        dueDate  = padLeft (Pad 4) $ hLimit 20 $ renderWrappedTxt $ pack $
+        tags = padLeft (Pad 5) $ (renderWrappedTxt . Data.Text.unwords) (todo ^. todoTags)
+        dueDate  = padLeft (Pad 5) $ hLimit 20 $ renderWrappedTxt $ pack $
           case todo ^. todoDueDate of
             Nothing -> ""
             Just d  -> "Deadline: " <> formatTime defaultTimeLocale "%Y-%d-%m" d
@@ -291,8 +266,8 @@ nadaAppDraw st = case _currentMode st of
 
 appEventNormal :: BrickEvent Name e -> EventM Name NadaState ()
 -- Scroll for Task Viewport
--- appEventNormal (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1
--- appEventNormal (MouseDown _ E.BScrollUp   _ _) = M.vScrollBy vp0Scroll (-1)
+appEventNormal (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1
+appEventNormal (MouseDown _ E.BScrollUp   _ _) = M.vScrollBy vp0Scroll (-1)
 -- Keyboard Shortcuts
 appEventNormal (VtyEvent vtyE) = case vtyE of
   V.EvKey (V.KChar 'q') [] -> do
@@ -425,11 +400,14 @@ createAttrNames tl = Prelude.zip names myAttrs
 
 myAttrs :: [V.Attr]
 myAttrs = [ fg V.yellow
-          -- , fg V.magenta
-          -- , fg V.brightCyan
+          , fg V.magenta
+          , fg V.brightCyan
           , fg V.brightRed
           , fg V.brightGreen
           , fg V.brightBlue
+          , fg V.brightYellow
+          , fg V.cyan
+          , fg V.red
           --   V.white  `on` V.green
           -- , V.yellow `on` V.black
           -- , V.white  `on` V.red

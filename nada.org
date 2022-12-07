@@ -10,13 +10,9 @@
   DEADLINE: <2022-12-04 Sun>
 
 
-** TODO [#B] Test anotherTask :home:school:
-   DEADLINE: <2022-12-31 Sat>
+* TODO [#B] Test anotherTask :home:school:
+  DEADLINE: <2022-12-31 Sat>
 
 
 * TODO [#B] display warning when we don't completely read an input file
   DEADLINE: <2022-12-04 Sun>
-
-
-* TODO [#C] task :leisure:
-DONE [#B] Testing. : home:leisure:
