@@ -4,15 +4,12 @@
 module Main (main) where
 
 import qualified Brick
-import qualified Brick.Widgets.Edit as Ed
-import Data.Maybe (fromMaybe)
 import qualified Data.Org as O
 import qualified Data.Sequence as Seq
-import Data.Text (Text, isInfixOf, splitOn, unpack)
+import Data.Text (Text, splitOn, unpack)
 import qualified Data.Text.IO as Text
 import Data.Time (Day, defaultTimeLocale, parseTimeM)
 import Lens.Micro
-import Nada.Types hiding (Edit)
 import Nada.App
 import Nada.Org
 import Nada.Types

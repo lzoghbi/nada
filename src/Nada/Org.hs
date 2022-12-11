@@ -12,11 +12,10 @@ module Nada.Org (
 import Nada.Types
 import Nada.Calendar (makeCalendarStateForCurrentDay)
 
-import Brick.Widgets.Edit as Ed
 import Data.Foldable (find, toList)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Org as O
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
@@ -39,7 +38,7 @@ orgFileToNada :: O.OrgFile -> IO NadaState
 -- convert a section to a 'Todo' (represented as 'orgSectionToNadaTodo'
 -- returning 'Nothing').
 -- Reserved 0 - 9 for other clickable widgets.
-orgFileToNada org = do 
+orgFileToNada org = do
   calendarState <- makeCalendarStateForCurrentDay
   let (newState, assignedIds) = addTodosToState (defaultNadaStateFromCalendarState calendarState) correctlyParsedTodos
   pure (newState & (visibleTodoLists.ix 0.todoList) .~ Seq.fromList assignedIds
@@ -47,8 +46,8 @@ orgFileToNada org = do
   where
     tags = O.allDocTags $ O.orgDoc org
     docSections = O.docSections $ O.orgDoc org
-    correctlyParsedTodos = catMaybes $ orgSectionToNadaTodo <$> zip [0..] docSections
-    
+    correctlyParsedTodos = mapMaybe orgSectionToNadaTodo (zip [0..] docSections)
+
 orgSectionToNadaTodo :: (Integer, O.Section) -> Maybe Todo
 orgSectionToNadaTodo (tdId, O.Section{..}) = do
   -- FIXME: We return 'Nothing' if the 'Section' is missing 'sectionTodo'.
@@ -63,8 +62,8 @@ orgSectionToNadaTodo (tdId, O.Section{..}) = do
   let name = orgWordsToText sectionHeading
       description = fromMaybe T.empty (findDescription sectionDoc)
       dueDate  = findDueDate sectionDeadline
-      priority = orgPrioToNadaPrio sectionPriority  
-      subTasks = findSubSections sectionDoc   
+      priority = orgPrioToNadaPrio sectionPriority
+      subTasks = findSubSections sectionDoc
   pure $ Todo
     { _todoName = name
     -- FIXME: We might want to change the 'Todo' datatype to have
@@ -105,11 +104,11 @@ findDescription O.OrgDoc{..} = do
   pure (orgWordsToText descWords)
 
 findSubSections :: O.OrgDoc -> [Todo]
-findSubSections O.OrgDoc{..} = 
-  if null docSections 
+findSubSections O.OrgDoc{..} =
+  if null docSections
   then []
-  else catMaybes $ orgSectionToNadaTodo <$> zip [100..] docSections
-  
+  else mapMaybe orgSectionToNadaTodo (zip [100..] docSections)
+
 orgWordsToText :: NonEmpty O.Words -> Text
 -- FIXME: This is a hack to convert Data.Org's 'Words' into a 'Text'.
 -- Eventually if we support rendering italics, underlines, etc. we should
@@ -154,8 +153,7 @@ nadaPrioToOrgPrio Medium = O.Priority { priority = "B" }
 nadaPrioToOrgPrio Low    = O.Priority { priority = "C" }
 
 nadaSubTasksToOrgSection :: [Todo] -> [O.Section]
-nadaSubTasksToOrgSection [] = []
-nadaSubTasksToOrgSection (t:ts) = (nadaTodoToOrgSection t : nadaSubTasksToOrgSection ts)
+nadaSubTasksToOrgSection = map nadaTodoToOrgSection
 
 -- | Represents a 'Todo' as a 'Section'
 --
