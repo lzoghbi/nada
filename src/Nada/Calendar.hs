@@ -50,6 +50,7 @@ makeCalendarStateForCurrentDay = do
   pure $ makeEmptyCalendarStateFromDay day
  
 
+-- TODO: Make header clickable to adjust month/year + add keybindings for that
 drawCalendar :: Ord n => n -> (Day -> n) -> CalendarState n -> Widget n
 drawCalendar _calendarName dayToName state@CalendarState{..} = header <=> drawCalendarBody dayToName state <=> footer
   where
