@@ -266,11 +266,11 @@ currentModeBar st = str $ show $ st ^. currentMode
 
 -- Scroll functionality for Todo Viewport
 vp0Scroll :: M.ViewportScroll Name
-vp0Scroll = M.viewportScroll mkNadaVP
+vp0Scroll = M.viewportScroll NadaVP
 
 nadaAppDraw :: NadaState -> [Widget Name]
 nadaAppDraw st = case _currentMode st of
-  ModeCalendar -> [drawCalendar (_calendarState st)]
+  ModeCalendar -> [drawCalendar (Calendar NadaCalendar) (Calendar . NadaCalendarDay) (_calendarState st)]
   _            -> [ui]
   where
     ui =
@@ -422,8 +422,7 @@ appEvent ev = do
                   ModeEdit         -> appEventEdit ev
                   ModeEditTag      -> appEventEdit ev
                   ModeEditDeadline -> appEventEdit ev
-                  ModeCalendar     -> appEventCalendar exitCalendar calendarState ev
-                  _                -> return ()
+                  ModeCalendar     -> appEventCalendar calendarState nameToDay exitCalendar ev
   where
     exitCalendar = modify (currentMode .~ ModeNormal)
 

@@ -84,7 +84,7 @@ orgSectionToNadaTodo (tdId, O.Section{..}) = do
     -- The more natural thing to do would be to just return the largest id from
     -- 'orgFileToNada'. Or eventually rework this function to make use of
     -- our function to create a new todo (once implemented).
-    , _todoId = mkTodoId tdId
+    , _todoId = TodoId tdId
     , _todoDueDate  = dueDate
     , _todoPriority = priority
     , _todoTags = sectionTags

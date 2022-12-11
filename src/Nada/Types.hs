@@ -17,25 +17,25 @@ import Lens.Micro
 import Lens.Micro.GHC ()
 import Lens.Micro.TH (makeLenses)
 import Data.Time (Day)
-import Nada.Calendar (CalendarState(..), WithCalendarName(..))
+import Nada.Calendar (CalendarState(..))
 
-data NadaName = TodoId Integer
-              | TodoEditor
-              | NadaVP
+data NadaCalendar
+  = NadaCalendar
+  | NadaCalendarDay Day
   deriving (Eq, Show, Ord)
 
-type Name = WithCalendarName NadaName
+data Name
+  = TodoId Integer
+  | TodoEditor
+  | NadaVP
+  | Calendar NadaCalendar
+  deriving (Eq, Show, Ord)
 
-mkTodoId :: Integer -> Name
-mkTodoId = OtherName . TodoId
+nameToDay :: Name -> Maybe Day
+nameToDay (Calendar (NadaCalendarDay d)) = Just d
+nameToday _ = Nothing
 
-mkTodoEditor :: Name
-mkTodoEditor = OtherName TodoEditor
-
-mkNadaVP :: Name
-mkNadaVP = OtherName NadaVP
-
-data NadaPriority = High 
+data NadaPriority = High
                   | Medium 
                   | Low 
    deriving (Eq, Show)
@@ -82,7 +82,7 @@ makeLenses ''TodoList
 makeLenses ''NadaState
 
 resourceNameToInteger :: Name -> Integer
-resourceNameToInteger (OtherName (TodoId n)) = n
+resourceNameToInteger (TodoId n) = n
 
 -- Create a default Todo with a given ID
 defaultTodo :: Integer -> Todo
@@ -90,7 +90,7 @@ defaultTodo intId = Todo {
   _todoName = "todo"
 , _todoDescription = ""
 , _todoCompleted = False
-, _todoId = mkTodoId intId
+, _todoId = TodoId intId
 , _todoDueDate = Nothing
 , _todoPriority = Medium
 , _todoTags = []
@@ -109,7 +109,7 @@ defaultNadaStateFromCalendarState calendarState = NadaState {
   -- Always have atleast one TodoList
   _visibleTodoLists = [defaultTodoList]
 , _todosMap = Map.empty
-, _todoEditor = Ed.editor mkTodoEditor (Just 1) ""
+, _todoEditor = Ed.editor TodoEditor (Just 1) ""
 , _nextAvailableId = 0
 , _selectedTodoList = 0
 , _currentMode = ModeNormal
@@ -119,7 +119,7 @@ defaultNadaStateFromCalendarState calendarState = NadaState {
 
 -- Set the ID of a Todo, updating also the ID of the Editor inside
 setTodoId :: Integer -> Todo -> Todo
-setTodoId newId td = td & todoId .~ mkTodoId newId
+setTodoId newId td = td & todoId .~ TodoId newId
 
 -- Add a Todo to the map of Todos, handling the updating of the indices
 -- Returns the updated NadaState and the assigned Index
@@ -192,6 +192,3 @@ getSelectedTodoId st = selTodoId
 showDate :: Maybe Day -> [Text]
 showDate (Just a) = [Data.Text.pack $ showGregorian a]
 showDate Nothing  = [Data.Text.pack $ showGregorian systemEpochDay]
-
-
-
