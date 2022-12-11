@@ -31,6 +31,7 @@ import qualified Graphics.Vty as V
 import qualified Graphics.Vty.Input.Events as E
 
 import Lens.Micro ( (%~), ASetter' )
+import Data.List (intersperse)
 
 data CalendarState resourceName
   = CalendarState
@@ -58,11 +59,11 @@ drawCalendar _calendarName dayToName state@CalendarState{..} = header <=> drawCa
     footer = str "[j]: Down [k]: Up [h]: Left [l]: Right [C-u]: Prev month [C-d]: Next month [q/<Esc>]: Exit"
 
 drawCalendarBody :: Ord n => (Day -> n) -> CalendarState n -> Widget n
-drawCalendarBody dayToName state@CalendarState{..} = joinBorders . vBox $
+drawCalendarBody dayToName state@CalendarState{..} = joinBorders . border . vBox . intersperse hBorder $
   weekHeader 
   : map (drawWeek dayToName state) weeks
   where
-    weekHeader = hBox $ map (border . hCenter . str)
+    weekHeader = vLimit 1 . hBox . intersperse vBorder $ map (hCenter . str)
       [ "MON"
       , "TUE"
       , "WED"
@@ -74,13 +75,13 @@ drawCalendarBody dayToName state@CalendarState{..} = joinBorders . vBox $
     weeks = chunksOf 7 (calendarBlock calendarSelectedMonth)
 
 drawWeek :: Ord n => (Day -> n) -> CalendarState n -> [Day] -> Widget n
-drawWeek dayToName state days = hBox $ map (drawDay dayToName state) days
+drawWeek dayToName state days = hBox . intersperse vBorder $ map (drawDay dayToName state) days
 
 drawDay :: Ord n => (Day -> n) -> CalendarState n -> Day -> Widget n
-drawDay dayToName CalendarState{..} day = addSelectionHighlight . border . clickable widgetName $
+drawDay dayToName CalendarState{..} day = addSelectionHighlight . clickable widgetName $
   case widgets of
-    Nothing -> dayWidget
-    Just ws -> dayWidget <=> ws
+    Nothing -> dayWidget <=> fill ' '
+    Just ws -> dayWidget <=> ws <=> fill ' '
   where
     YearMonthDay _ _ dayOfMonth = day
     month = dayPeriod day
