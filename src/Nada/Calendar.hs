@@ -4,6 +4,7 @@ module Nada.Calendar
   (
     drawCalendar
   , appEventCalendar
+  , appEventCalendarLens
   , CalendarState(..)
   , makeCalendarStateForCurrentDay
   -- * Exposed for testing
@@ -29,7 +30,7 @@ import Data.Time.Format
 import qualified Graphics.Vty as V
 import qualified Graphics.Vty.Input.Events as E
 
-import Lens.Micro ( (%~), ASetter' )
+import Lens.Micro ( (%~), ASetter', sets)
 import Data.List (intersperse)
 
 data CalendarState resourceName
@@ -216,18 +217,19 @@ prevDay = adjustDay pred
 nextDay :: CalendarState n -> CalendarState n
 nextDay = adjustDay succ
 
-appEventCalendar :: ASetter' s (CalendarState n) -> (n -> Maybe Day) -> EventM n s () -> BrickEvent n e -> EventM n s ()
+-- | Specialized version of 'appEventCalendar' that uses a lens instead of a getter and setter.
+appEventCalendarLens :: ASetter' s (CalendarState n) -> (n -> Maybe Day) -> EventM n s () -> BrickEvent n e -> EventM n s ()
 -- Select cell
-appEventCalendar calendarState nameToDay _ (MouseDown n E.BLeft _ _) = case nameToDay n of
-  Just day -> modify (calendarState %~ \state -> state{calendarSelectedDate = day})
-  Nothing  -> pure ()
+appEventCalendarLens calendarState nameToDay _ (MouseDown n E.BLeft _ _) = case nameToDay n of
+  Just day -> modify (calendarState %~ \state -> state {calendarSelectedDate = day})
+  Nothing -> pure ()
 -- Scroll through weeks
-appEventCalendar calendarState _ _ (MouseDown _ E.BScrollDown _ _) =
+appEventCalendarLens calendarState _ _ (MouseDown _ E.BScrollDown _ _) =
   modify $ calendarState %~ nextSelectedMonth
-appEventCalendar calendarState _ _ (MouseDown _ E.BScrollUp   _ _) =
+appEventCalendarLens calendarState _ _ (MouseDown _ E.BScrollUp _ _) =
   modify $ calendarState %~ prevSelectedMonth
 -- Move across days
-appEventCalendar calendarState _ exitCalendar (VtyEvent vtyE) = case vtyE of
+appEventCalendarLens calendarState _ exitCalendar (VtyEvent vtyE) = case vtyE of
   V.EvKey (V.KChar 'j') [] ->
     modify $ calendarState %~ nextWeek
   V.EvKey (V.KChar 'k') [] ->
@@ -245,4 +247,9 @@ appEventCalendar calendarState _ exitCalendar (VtyEvent vtyE) = case vtyE of
   V.EvKey V.KEsc [] ->
     exitCalendar
   _ -> pure ()
-appEventCalendar _ _ _ _ = pure ()
+appEventCalendarLens _ _ _ _ = pure ()
+
+appEventCalendar :: (s -> CalendarState n) -> (CalendarState n -> s) -> (n -> Maybe Day) -> EventM n s () -> BrickEvent n e -> EventM n s ()
+appEventCalendar getCalendar setCalendar = appEventCalendarLens calendarState
+  where
+    calendarState = sets $ \modifyCalendar s -> setCalendar (modifyCalendar $ getCalendar s)

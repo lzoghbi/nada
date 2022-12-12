@@ -420,7 +420,7 @@ appEvent ev = do
                   ModeEdit         -> appEventEdit ev
                   ModeEditTag      -> appEventEdit ev
                   ModeEditDeadline -> appEventEdit ev
-                  ModeCalendar     -> appEventCalendar calendarState nameToDay exitCalendar ev
+                  ModeCalendar     -> appEventCalendarLens calendarState nameToDay exitCalendar ev
   where
     exitCalendar = modify (currentMode .~ ModeNormal)
 
