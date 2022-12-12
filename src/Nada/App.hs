@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Nada.App (
   nadaApp,
@@ -9,7 +8,7 @@ import Nada.Types
 import Nada.Calendar
 
 import Data.List (intersperse)
-import Data.Text (Text, pack, unpack, lines, unlines, words, unwords, isInfixOf)
+import Data.Text (Text, pack, unpack, lines, unlines, words, unwords)
 import Data.Text.Zipper (textZipper)
 import Data.Time
   ( formatTime
@@ -23,7 +22,6 @@ import Text.Wrap
   , preserveIndentation
   , breakLongWords
   , wrapText
-  , wrapTextToLines
   )
 
 import Brick
@@ -37,16 +35,14 @@ import qualified Graphics.Vty as V
 import qualified Graphics.Vty.Input.Events as E
 
 import Control.Monad.State
-import Data.Map (Map(..))
+import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Sequence (Seq(..))
 import qualified Data.Sequence as Seq
-import qualified Graphics.Vty as V
-import qualified Graphics.Vty.Input.Events as E
 
 import Lens.Micro
 import Lens.Micro.Mtl
 import Lens.Micro.Platform ()
+import Data.Maybe (fromMaybe)
 
 -- FIXME: Separate this function from needing integers and use it with the
 -- calendar.
@@ -77,7 +73,7 @@ drawTodo iTodo jTodoList st =
   withStyle $
     drawTodoBare iTodo jTodoList st
     <=> tags
-    <=> (padBottom (Pad 1) dueDate)
+    <=> padBottom (Pad 1) dueDate
     <=> drawDescription
   where
     thisTodoId     = st ^?! visibleTodoLists.ix (fromInteger jTodoList).todoList.ix (fromInteger iTodo)
@@ -97,22 +93,22 @@ drawTodo iTodo jTodoList st =
     drawCompleted True  = txt "[X]"
     drawCompleted False = txt "[ ]"
     drawDescription = padLeft (Pad 4) $ renderWrappedTxt (thisTodo ^. todoDescription)
-    tags = padLeft (Pad 5) $ hBox $ fmap (drawTag st) (thisTodo ^. todoTags) 
+    tags = padLeft (Pad 5) $ hBox $ fmap (drawTag st) (thisTodo ^. todoTags)
     dueDate  = padLeft (Pad 5) $ withAttr (attrName "deadline") $ hLimit 20 $ renderWrappedTxt $ pack $
       case thisTodo ^. todoDueDate of
         Nothing -> ""
         Just d  -> "Deadline: " <> formatTime defaultTimeLocale "%Y-%m-%d" d
-    drawSubTasks = vBox $ fmap (drawSubTodo st) $ thisTodo ^. todoSubTasks     
+    drawSubTasks = vBox $ fmap (drawSubTodo st) $ thisTodo ^. todoSubTasks
 
 drawTag :: NadaState -> Text -> Widget Name
 drawTag st tag = padRight (Pad 1)$
   updateAttrMap (A.applyAttrMappings (createAttrNames $ st^.allTags)) $
-  withAttr (attrName $ unpack tag) 
+  withAttr (attrName $ unpack tag)
   $ renderWrappedTxt tag
 
 drawSubTodo :: NadaState -> Todo -> Widget Name
-drawSubTodo st todo = T.Widget T.Fixed T.Fixed $ 
-  do 
+drawSubTodo st todo = T.Widget T.Fixed T.Fixed $
+  do
     let nextId = st ^. nextAvailableId
         st = st & nextAvailableId .~ nextId + 1
     T.render $
@@ -345,14 +341,14 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
                                 st <- get
                                 let nTodoLists = length $ st ^. visibleTodoLists
                                 selectedTodoList += 1
-                                selectedTodoList %= \i -> if i >= toInteger nTodoLists 
-                                                            then 0 
+                                selectedTodoList %= \i -> if i >= toInteger nTodoLists
+                                                            then 0
                                                             else i
                                 return ()
   V.EvKey (V.KChar 'c') [] -> do
                                 freshCalendarState <- liftIO $ makeCalendarStateForCurrentDay
-                                todos <- getBareTodosByDate <$> get
-                                let cs = freshCalendarState{calendarWidgets = addToCalendarWidgets todos}
+                                todos <- gets getBareTodosByDate
+                                let cs = freshCalendarState{calendarWidgets = makeCalendarWidgets todos}
                                 modify (calendarState .~ cs)
                                 modify (currentMode .~ ModeCalendar)
   V.EvKey (V.KChar 'w') [] -> do
@@ -363,7 +359,7 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
                                                               & todoList .~ Seq.fromList [newId]
                                 id %= addTodoListToState newList
                                 todoLists <- use visibleTodoLists
-                                let nTodoLists = length $ todoLists
+                                let nTodoLists = length todoLists
                                 selectedTodoList .= toInteger nTodoLists - 1
   V.EvKey (V.KChar 'x') [] -> do
                                 todoLists <- use visibleTodoLists
@@ -372,16 +368,16 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
                                 let newTodoLists = l ++ tail r
                                 visibleTodoLists .= newTodoLists
                                 selectedTodoList %= max 0 . min (toInteger $ length newTodoLists - 1)
-                            
+
   _ -> return ()
 appEventNormal _ = return ()
 
 -- FIXME: This is horrific
 getBareTodosByDate :: NadaState -> [(Day, Widget Name)]
 getBareTodosByDate st = do
-  todo <- Map.elems $ (st ^. todosMap)
+  todo <- Map.elems (st ^. todosMap)
   case todo ^. todoDueDate of
-    Just dueDate -> pure $ (dueDate, drawTodoSimple todo)
+    Just dueDate -> pure (dueDate, drawTodoSimple todo)
     Nothing -> []
   where
     drawTodoSimple todo = txtWrapWith settings $
@@ -392,8 +388,10 @@ getBareTodosByDate st = do
                                    , breakLongWords = True
                                    }
 
-addToCalendarWidgets :: [(Day, Widget Name)] -> Map Day [Widget Name]
-addToCalendarWidgets = foldr (\(day, widget) m -> Map.insertWith (<>) day [widget] m) mempty
+makeCalendarWidgets :: [(Day, Widget Name)] -> (Day -> [Widget Name])
+makeCalendarWidgets daysToWidgets day = fromMaybe [] (Map.lookup day dayToWidgetMap)
+  where
+    dayToWidgetMap = foldr (\(d, widget) m -> Map.insertWith (<>) d [widget] m) mempty daysToWidgets
 
 appEventEdit :: BrickEvent Name e -> EventM Name NadaState ()
 appEventEdit ev = case ev of
@@ -405,8 +403,8 @@ appEventEdit ev = case ev of
     mode <- use currentMode
     case mode of
       ModeEdit -> todosMap . ix selTodoId . todoName .= theText
-      ModeEditTag -> todosMap . ix selTodoId . todoTags .= Data.Text.words (theText)
-      ModeEditDeadline -> 
+      ModeEditTag -> todosMap . ix selTodoId . todoTags .= Data.Text.words theText
+      ModeEditDeadline ->
         todosMap . ix selTodoId . todoDueDate .=
           if theText /= "\n"
             then parseTimeM True defaultTimeLocale "%Y-%m-%d" (Data.Text.unpack theText) :: Maybe Day
@@ -457,10 +455,10 @@ theMap :: AttrMap
 theMap =
   attrMap
     V.defAttr
-    [ (selectedAttr, V.black `on` (V.rgbColor 253 253 150))
+    [ (selectedAttr, V.black `on` V.rgbColor 253 253 150)
     , (editingAttr, V.white `on` V.blue)
     , (attrName "deadline",  V.withStyle (fg V.blue) V.italic)
-    , (attrName "todoname", V.withStyle (V.defAttr) V.bold)
+    , (attrName "todoname", V.withStyle V.defAttr V.bold)
     -- , (Ed.editAttr,                   V.white `on` V.blue)
     -- , (Ed.editFocusedAttr,            V.black `on` V.yellow)
     ]

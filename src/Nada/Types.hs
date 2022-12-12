@@ -16,7 +16,6 @@ import qualified Brick.Widgets.Edit as Ed
 import Lens.Micro
 import Lens.Micro.GHC ()
 import Lens.Micro.TH (makeLenses)
-import Data.Time (Day)
 import Nada.Calendar (CalendarState(..))
 
 data NadaCalendar

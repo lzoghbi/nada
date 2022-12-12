@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiWayIf #-}
 module Nada.Calendar
   (
     drawCalendar
@@ -8,7 +9,7 @@ module Nada.Calendar
   -- * Exposed for testing
   , makeEmptyCalendarStateFromDay
   , calendarBlockRange
-  , firstMondayBefore
+  , firstDayOfWeekOnBefore
   , prevSelectedMonth
   , nextSelectedMonth
   , prevWeek
@@ -20,8 +21,6 @@ module Nada.Calendar
 import Brick
 import Brick.Widgets.Center (hCenter)
 import Brick.Widgets.Border
-import Data.Map (Map)
-import qualified Data.Map as M
 import Data.Time (getZonedTime, zonedTimeToLocalTime, localDay)
 import Data.Time.Calendar
 import Data.Time.Calendar.Month
@@ -37,7 +36,7 @@ data CalendarState resourceName
   = CalendarState
   { calendarSelectedDate  :: Day
   , calendarSelectedMonth :: Month
-  , calendarWidgets :: Map Day [Widget resourceName]
+  , calendarWidgets :: Day -> [Widget resourceName]
   }
 
 makeEmptyCalendarStateFromDay :: Day -> CalendarState n
@@ -80,9 +79,7 @@ drawWeek dayToName state days = hBox . intersperse vBorder $ map (drawDay dayToN
 
 drawDay :: Ord n => (Day -> n) -> CalendarState n -> Day -> Widget n
 drawDay dayToName CalendarState{..} day = addSelectionHighlight . clickable widgetName $
-  case widgets of
-    Nothing -> dayWidget <=> fill ' '
-    Just ws -> dayWidget <=> ws <=> fill ' '
+    dayWidget <=> widgets <=> fill ' '
   where
     YearMonthDay _ _ dayOfMonth = day
     month = dayPeriod day
@@ -93,24 +90,21 @@ drawDay dayToName CalendarState{..} day = addSelectionHighlight . clickable widg
     addSelectionHighlight
       | calendarSelectedDate == day = forceAttr $ attrName "selected"
       | otherwise = id
-    widgets = vBox <$> M.lookup day calendarWidgets
+    widgets = vBox $ calendarWidgets day
     widgetName = dayToName day
 
--- | Gets the first Monday before the date. Returns the date if it is a Monday.
-firstMondayBefore :: Day -> Day
-firstMondayBefore day = case dayOfWeek day of
-  Monday -> day
-  _      -> firstMondayBefore (pred day)
+-- Modified defintion of 'firstDayOfWeekOnAfter'.
+firstDayOfWeekOnBefore :: DayOfWeek -> Day -> Day
+firstDayOfWeekOnBefore dw d = addDays (negate . toInteger $ dayOfWeekDiff (dayOfWeek d) dw) d
 
 calendarBlockRange :: Month -> (Day, Day)
 -- We will at least add 27 to accommodate the shortest months, but we might need
 -- to add more to accommodate longer months.
 calendarBlockRange month = (firstMonday, lastDate (addDays 27 firstMonday))
   where
-    firstMonday = firstMondayBefore $ periodFirstDay month
-    lastOfMonth = periodLastDay month
+    firstMonday = firstDayOfWeekOnBefore Monday $ periodFirstDay month
     lastDate d
-      | d >= lastOfMonth = d
+      | d >= periodLastDay month = d
       | otherwise = lastDate (addDays 7 d)
 
 calendarBlock :: Month -> [Day]
@@ -124,19 +118,77 @@ chunksOf n xs = chunk : chunksOf n rest
   where
     (chunk, rest) = splitAt n xs
 
--- | Adjusts the day and changes the selected month if the day is out of bounds.
+indexInCalendarBlockRange :: Day -> Month -> Integer
+indexInCalendarBlockRange day month = diffDays day start
+  where
+    (start, _end) = calendarBlockRange month
+
+dayFromCalendarBlockRangeIndex :: Month -> Integer -> Day
+dayFromCalendarBlockRangeIndex month i = addDays i start
+  where
+    (start, _end) = calendarBlockRange month
+
+-- | To be used in 'nextMonth' and 'prevMonth'.
+-- The idea here is that if your date is the last Thursday (index 38) in a block with 6 weeks = 42 days
+-- but you want to skip to a block with 3 weeks = 35 days, the natural thing to do is to select the
+-- last Thursday of the next block (index 31). The other option is to simply clamp at the maximum, but
+-- that would look weird.
+clampIndexToBlockRange :: Month -> Integer -> Integer
+clampIndexToBlockRange month = clampIndex
+  where
+    (start, end) = calendarBlockRange month
+    blockRangeMaxIndex = diffDays end start
+    clampIndex i
+      | i <= blockRangeMaxIndex = i
+      | otherwise = clampIndex (i - 7)
+
+-- | Adjusts the day. If it exits the current calendar block, clamps to the
+-- start/end of the preceding/following calendar block, respectively. Meant to
+-- only be used in 'prevDay' and 'nextDay'.
 adjustDay :: (Day -> Day) -> CalendarState n -> CalendarState n
-adjustDay adjustment state@CalendarState{..} = if adjustedDay < currentBlockStart || adjustedDay > currentBlockEnd
-  then
-    -- Note that it does not suffice to always set the selected month to the
-    -- corresponding month of 'adjustedDay' because block ranges generally
-    -- contain multiple months.
-    state{calendarSelectedDate = adjustedDay, calendarSelectedMonth = dayPeriod adjustedDay}
-  else
-    state{calendarSelectedDate = adjustedDay}
+adjustDay adjustment state@CalendarState{..} =
+  if
+    | adjustedDay < currentBlockStart -> state{calendarSelectedDate = newBlockEnd, calendarSelectedMonth = newMonth}
+    | adjustedDay > currentBlockEnd   -> state{calendarSelectedDate = newBlockStart, calendarSelectedMonth = newMonth}
+    | otherwise                       -> state{calendarSelectedDate = adjustedDay}
   where
     (currentBlockStart, currentBlockEnd) = calendarBlockRange calendarSelectedMonth
     adjustedDay = adjustment calendarSelectedDate
+    newMonth = dayPeriod adjustedDay
+    (newBlockStart, newBlockEnd) = calendarBlockRange newMonth
+
+-- | Adjusts the week. If it exits the current calendar block, finds the first/last
+-- day with the same day of the week as the current selected date. This ensures that
+-- movement is seamless between blocks.
+adjustWeek :: (Day -> Day) -> CalendarState n -> CalendarState n
+adjustWeek adjustment state@CalendarState{..} =
+  if
+    | adjustedDay < currentBlockStart -> state{ calendarSelectedDate =
+                                                firstDayOfWeekOnBefore currentDayOfWeek newBlockEnd
+                                              , calendarSelectedMonth = newMonth
+                                              }
+    | adjustedDay > currentBlockEnd   -> state{ calendarSelectedDate =
+                                                firstDayOfWeekOnAfter  currentDayOfWeek newBlockStart
+                                              , calendarSelectedMonth = newMonth
+                                              }
+    | otherwise                       -> state{ calendarSelectedDate = adjustedDay }
+  where
+    (currentBlockStart, currentBlockEnd) = calendarBlockRange calendarSelectedMonth
+    currentDayOfWeek = dayOfWeek calendarSelectedDate
+    adjustedDay = adjustment calendarSelectedDate
+    newMonth = dayPeriod adjustedDay
+    (newBlockStart, newBlockEnd) = calendarBlockRange newMonth
+
+-- | Changes both selected month and selected day, attempting to preserve the
+-- index of the day in the block range (not the date itself).  Keeps the same
+-- day of the week when selected date's relative index exceeds the bounds of the
+-- next month (see 'clampIndexToBlockRange').
+adjustMonth :: (Month -> Month) -> CalendarState n -> CalendarState n
+adjustMonth adjustment state@CalendarState{..} = state{calendarSelectedMonth = newMonth, calendarSelectedDate = newDay}
+  where
+    newMonth = adjustment calendarSelectedMonth
+    newIndex = clampIndexToBlockRange newMonth $ indexInCalendarBlockRange calendarSelectedDate calendarSelectedMonth
+    newDay = dayFromCalendarBlockRangeIndex newMonth newIndex
 
 -- | Does not change the selected day
 prevSelectedMonth :: CalendarState n -> CalendarState n
@@ -146,18 +198,17 @@ prevSelectedMonth state@CalendarState{..} = state{calendarSelectedMonth = pred c
 nextSelectedMonth :: CalendarState n -> CalendarState n
 nextSelectedMonth state@CalendarState{..} = state{calendarSelectedMonth = succ calendarSelectedMonth}
 
--- FIXME: Need to keep the same relative location in the calendarBlock
--- nextMonth :: CalendarState n -> CalendarState n
--- nextMonth state@CalendarState{..} = state{calendarSelectedMonth = succ calendarSelectedMonth, calendarSelectedDate = addDays 28 calendarSelectedDate}
--- 
--- prevMonth :: CalendarState n -> CalendarState n
--- prevMonth state@CalendarState{..} = state{calendarSelectedMonth = pred calendarSelectedMonth, calendarSelectedDate = addDays (-28) calendarSelectedDate}
+nextMonth :: CalendarState n -> CalendarState n
+nextMonth = adjustMonth succ
+
+prevMonth :: CalendarState n -> CalendarState n
+prevMonth = adjustMonth pred
 
 prevWeek :: CalendarState n -> CalendarState n
-prevWeek = adjustDay (addDays (-7))
+prevWeek = adjustWeek (addDays (-7))
 
 nextWeek :: CalendarState n -> CalendarState n
-nextWeek = adjustDay (addDays 7)
+nextWeek = adjustWeek (addDays 7)
 
 prevDay :: CalendarState n -> CalendarState n
 prevDay = adjustDay pred
@@ -186,9 +237,9 @@ appEventCalendar calendarState _ exitCalendar (VtyEvent vtyE) = case vtyE of
   V.EvKey (V.KChar 'l') [] ->
     modify $ calendarState %~ nextDay
   V.EvKey (V.KChar 'd') [V.MCtrl] ->
-    modify $ calendarState %~ nextSelectedMonth
+    modify $ calendarState %~ nextMonth
   V.EvKey (V.KChar 'u') [V.MCtrl] ->
-    modify $ calendarState %~ prevSelectedMonth
+    modify $ calendarState %~ prevMonth
   V.EvKey (V.KChar 'q') [] ->
     exitCalendar
   V.EvKey V.KEsc [] ->
