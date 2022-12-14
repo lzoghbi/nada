@@ -1,11 +1,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RankNTypes #-}
 module Nada.Calendar
   (
     drawCalendar
   , appEventCalendar
   , appEventCalendarLens
   , CalendarState(..)
+  , CalendarName(..)
+  , CalendarNameConverter(..)
   , makeCalendarStateForCurrentDay
   -- * Exposed for testing
   , makeEmptyCalendarStateFromDay
@@ -22,6 +25,7 @@ module Nada.Calendar
 import Brick
 import Brick.Widgets.Center (hCenter)
 import Brick.Widgets.Border
+import Data.List (intersperse)
 import Data.Time (getZonedTime, zonedTimeToLocalTime, localDay)
 import Data.Time.Calendar
 import Data.Time.Calendar.Month
@@ -30,39 +34,104 @@ import Data.Time.Format
 import qualified Graphics.Vty as V
 import qualified Graphics.Vty.Input.Events as E
 
-import Lens.Micro ( (%~), ASetter', sets)
-import Data.List (intersperse)
+import Lens.Micro ( (%~), (^.), Lens', lens)
+
+data CalendarName
+  = CalendarBody -- ^ As of now, this is unused.
+  | CalendarDate Day -- ^ A date, rendered as a cell in the calendar grid.
+  | CalendarMonth MonthOfYear -- ^ The month, rendered on the top left.
+  | CalendarYear Year -- ^ The year, rendered on the top left.
+  | CalendarNextMonth -- ^ The next month button, rendered on the top right.
+  | CalendarPrevMonth -- ^ The prev month button, rendered on the top right.
+  deriving (Show, Eq, Ord)
+
+data CalendarNameConverter resourceName
+  = CalendarNameConverter
+  { toResourceName :: CalendarName -> resourceName
+  , matchCalendarName :: resourceName -> Maybe CalendarName
+  }
+
+data CalendarMode
+  = CalendarModeNormal
+  | CalendarModeEditMonthYear
 
 data CalendarState resourceName
   = CalendarState
   { calendarSelectedDate  :: Day
   , calendarSelectedMonth :: Month
   , calendarWidgets :: Day -> [Widget resourceName]
+  , calendarNameConverter :: CalendarNameConverter resourceName
+  -- , calendarMode :: CalendarMode
   }
 
-makeEmptyCalendarStateFromDay :: Day -> CalendarState n
-makeEmptyCalendarStateFromDay day = CalendarState day (dayPeriod day) mempty
+makeEmptyCalendarStateFromDay :: CalendarNameConverter n -> Day -> CalendarState n
+makeEmptyCalendarStateFromDay cn day = CalendarState day (dayPeriod day) mempty cn CalendarModeNormal
 
-makeCalendarStateForCurrentDay :: IO (CalendarState n)
-makeCalendarStateForCurrentDay = do
+makeCalendarStateForCurrentDay :: CalendarNameConverter n -> IO (CalendarState n)
+makeCalendarStateForCurrentDay cn = do
   now <- getZonedTime
   let day = localDay $ zonedTimeToLocalTime now
-  pure $ makeEmptyCalendarStateFromDay day
- 
+  pure $ makeEmptyCalendarStateFromDay cn day
 
--- TODO: Make header clickable to adjust month/year + add keybindings for that
-drawCalendar :: Ord n => n -> (Day -> n) -> CalendarState n -> Widget n
-drawCalendar _calendarName dayToName state@CalendarState{..} = header <=> drawCalendarBody dayToName state <=> footer
+monthNames :: [(MonthOfYear, String)]
+monthNames =
+  [ (1, "January")
+  , (2, "February")
+  , (3, "March")
+  , (4, "April")
+  , (5, "May")
+  , (6, "June")
+  , (7, "July")
+  , (8, "August")
+  , (9, "September")
+  , (10, "October")
+  , (11, "November")
+  , (12, "December")
+  ]
+
+-- drawEditMonth :: Ord n => CalendarState n -> Widget n
+-- drawEditMonth state = joinBorders . border . vBox $ map (drawMonth state) monthNames
+--
+-- drawMonth :: Ord n => CalendarState n -> (MonthOfYear, String) -> Widget n
+-- drawMonth CalendarState{..} (monthOfYear, monthName) =
+--   if monthOfYear == selectedMonthOfYear
+--     then selectedMonth
+--     else month
+--   where
+--     YearMonth year selectedMonthOfYear = calendarSelectedMonth
+--     month = str monthName
+--     selectedMonth = forceAttr (attrName "selected") month
+--
+-- drawCalendarWidget :: Ord n => CalendarState n -> [Widget n]
+-- drawCalendarWidget state@CalendarState{..} = case calendarMode of
+--   CalendarModeNormal -> [calendar]
+--   CalendarModeEditMonthYear -> [editMonth, calendar]
+--   where
+--     calendar  = drawCalendar state
+--     editMonth = drawEditMonth state
+
+drawCalendar :: Ord n => CalendarState n -> Widget n
+drawCalendar state@CalendarState{..} = header <=> drawCalendarBody state <=> footer
   where
-    YearMonth yearNumber _ = calendarSelectedMonth
-    monthName = formatTime defaultTimeLocale "%B" calendarSelectedMonth
-    header = str monthName <+> str " " <+> str (show yearNumber)
+    monthStr = formatTime defaultTimeLocale "%B" calendarSelectedMonth
+    yearStr = formatTime defaultTimeLocale "%Y" calendarSelectedMonth
+    monthYearName = toResourceName calendarNameConverter . CalendarMonthYear $ calendarSelectedMonth
+    -- Ensures all months are of the same visual length and
+    -- that the year doesn't get cut off by the month selector
+    month = hLimit 9 (str monthStr <+> fill ' ')
+    year = str yearStr
+    monthYear = clickable monthYearName $ str " " <+> month <+> str " " <+> year
+    prevMonthName = toResourceName calendarNameConverter CalendarPrevMonth
+    nextMonthName = toResourceName calendarNameConverter CalendarNextMonth
+    monthButtons = clickable prevMonthName (str "←") <+> str "  " <+> clickable nextMonthName (str "→")
+    -- Ensures that the fills do not occupy vertical space
+    header = vLimit 1 ( fill ' ') <=> vLimit 1 (monthYear <+> fill ' ' <+> monthButtons)
     footer = str "[j]: Down [k]: Up [h]: Left [l]: Right [C-u]: Prev month [C-d]: Next month [q/<Esc>]: Exit"
 
-drawCalendarBody :: Ord n => (Day -> n) -> CalendarState n -> Widget n
-drawCalendarBody dayToName state@CalendarState{..} = joinBorders . border . vBox . intersperse hBorder $
+drawCalendarBody :: Ord n => CalendarState n -> Widget n
+drawCalendarBody state@CalendarState{..} = joinBorders . border . vBox . intersperse hBorder $
   weekHeader 
-  : map (drawWeek dayToName state) weeks
+  : map (drawWeek state) weeks
   where
     weekHeader = vLimit 1 . hBox . intersperse vBorder $ map (hCenter . str)
       [ "MON"
@@ -75,11 +144,11 @@ drawCalendarBody dayToName state@CalendarState{..} = joinBorders . border . vBox
       ]
     weeks = chunksOf 7 (calendarBlock calendarSelectedMonth)
 
-drawWeek :: Ord n => (Day -> n) -> CalendarState n -> [Day] -> Widget n
-drawWeek dayToName state days = hBox . intersperse vBorder $ map (drawDay dayToName state) days
+drawWeek :: Ord n => CalendarState n -> [Day] -> Widget n
+drawWeek state days = hBox . intersperse vBorder $ map (drawDay state) days
 
-drawDay :: Ord n => (Day -> n) -> CalendarState n -> Day -> Widget n
-drawDay dayToName CalendarState{..} day = addSelectionHighlight . clickable widgetName $
+drawDay :: Ord n => CalendarState n -> Day -> Widget n
+drawDay CalendarState{..} day = addSelectionHighlight . clickable widgetName $
     dayWidget <=> widgets <=> fill ' '
   where
     YearMonthDay _ _ dayOfMonth = day
@@ -92,7 +161,7 @@ drawDay dayToName CalendarState{..} day = addSelectionHighlight . clickable widg
       | calendarSelectedDate == day = forceAttr $ attrName "selected"
       | otherwise = id
     widgets = vBox $ calendarWidgets day
-    widgetName = dayToName day
+    widgetName = toResourceName calendarNameConverter . CalendarDate $ day
 
 -- Modified defintion of 'firstDayOfWeekOnAfter'.
 firstDayOfWeekOnBefore :: DayOfWeek -> Day -> Day
@@ -191,6 +260,11 @@ adjustMonth adjustment state@CalendarState{..} = state{calendarSelectedMonth = n
     newIndex = clampIndexToBlockRange newMonth $ indexInCalendarBlockRange calendarSelectedDate calendarSelectedMonth
     newDay = dayFromCalendarBlockRangeIndex newMonth newIndex
 
+selectMonth :: MonthOfYear -> CalendarState n -> CalendarState n
+selectMonth m state@CalendarState{..} = state{calendarSelectedMonth = YearMonth year m}
+  where
+    YearMonth year _ = calendarSelectedMonth
+
 -- | Does not change the selected day
 prevSelectedMonth :: CalendarState n -> CalendarState n
 prevSelectedMonth state@CalendarState{..} = state{calendarSelectedMonth = pred calendarSelectedMonth}
@@ -217,19 +291,23 @@ prevDay = adjustDay pred
 nextDay :: CalendarState n -> CalendarState n
 nextDay = adjustDay succ
 
--- | Specialized version of 'appEventCalendar' that uses a lens instead of a getter and setter.
-appEventCalendarLens :: ASetter' s (CalendarState n) -> (n -> Maybe Day) -> EventM n s () -> BrickEvent n e -> EventM n s ()
--- Select cell
-appEventCalendarLens calendarState nameToDay _ (MouseDown n E.BLeft _ _) = case nameToDay n of
-  Just day -> modify (calendarState %~ \state -> state {calendarSelectedDate = day})
-  Nothing -> pure ()
--- Scroll through weeks
-appEventCalendarLens calendarState _ _ (MouseDown _ E.BScrollDown _ _) =
-  modify $ calendarState %~ nextSelectedMonth
-appEventCalendarLens calendarState _ _ (MouseDown _ E.BScrollUp _ _) =
-  modify $ calendarState %~ prevSelectedMonth
--- Move across days
-appEventCalendarLens calendarState _ exitCalendar (VtyEvent vtyE) = case vtyE of
+handleMouseCalendar :: Lens' s (CalendarState n) -> EventM n s () -> n -> V.Button -> [V.Modifier] -> EventM n s ()
+handleMouseCalendar calendarState _exitCalendar n button modifiers = do
+  CalendarNameConverter{..} <- calendarNameConverter <$> gets (^. calendarState)
+  case (button, modifiers) of
+    (E.BLeft, _) ->
+      case matchCalendarName n of
+        Just (CalendarDate day) -> modify (calendarState %~ \state -> state{calendarSelectedDate = day})
+        Just CalendarNextMonth  -> modify (calendarState %~ nextSelectedMonth)
+        Just CalendarPrevMonth  -> modify (calendarState %~ prevSelectedMonth)
+        _ -> pure ()
+    (E.BScrollDown, _) ->
+      modify $ calendarState %~ nextSelectedMonth
+    (E.BScrollUp, _) ->
+      modify $ calendarState %~ prevSelectedMonth
+
+handleKeyPressCalendar :: Lens' s (CalendarState n) -> EventM n s () -> V.Event -> EventM n s ()
+handleKeyPressCalendar calendarState exitCalendar vtyEvent = case vtyEvent of
   V.EvKey (V.KChar 'j') [] ->
     modify $ calendarState %~ nextWeek
   V.EvKey (V.KChar 'k') [] ->
@@ -242,14 +320,43 @@ appEventCalendarLens calendarState _ exitCalendar (VtyEvent vtyE) = case vtyE of
     modify $ calendarState %~ nextMonth
   V.EvKey (V.KChar 'u') [V.MCtrl] ->
     modify $ calendarState %~ prevMonth
+--  V.EvKey (V.KChar 'm') [] ->
+--    modify $ calendarState %~ (\state -> state{calendarMode = CalendarModeEditMonthYear})
   V.EvKey (V.KChar 'q') [] ->
     exitCalendar
   V.EvKey V.KEsc [] ->
     exitCalendar
   _ -> pure ()
-appEventCalendarLens _ _ _ _ = pure ()
 
-appEventCalendar :: (s -> CalendarState n) -> (CalendarState n -> s) -> (n -> Maybe Day) -> EventM n s () -> BrickEvent n e -> EventM n s ()
-appEventCalendar getCalendar setCalendar = appEventCalendarLens calendarState
-  where
-    calendarState = sets $ \modifyCalendar s -> setCalendar (modifyCalendar $ getCalendar s)
+-- handleMouseCalendarEditMonthYear :: Lens' s (CalendarState n) -> n -> V.Button -> [V.Modifier] -> EventM n s ()
+-- handleMouseCalendarEditMonthYear calendarState n button modifiers = pure ()
+--
+-- handleKeyPressCalendarEditMonthYear :: Lens' s (CalendarState n) -> V.Event -> EventM n s ()
+-- handleKeyPressCalendarEditMonthYear calendarState vtyEvent = case vtyEvent of
+--   V.EvKey (V.KChar 'j') [] ->
+--     modify $ calendarState %~ nextSelectedMonth
+--   V.EvKey (V.KChar 'k') [] ->
+--     modify $ calendarState %~ prevSelectedMonth
+--   V.EvKey (V.KChar 'q') [] ->
+--     modify $ calendarState %~ (\state -> state{calendarMode = CalendarModeNormal})
+--   V.EvKey V.KEsc [] ->
+--     modify $ calendarState %~ (\state -> state{calendarMode = CalendarModeNormal})
+--   _ -> pure ()
+
+-- | Specialized version of 'appEventCalendar' that uses a lens instead of a getter and setter.
+appEventCalendarLens :: Lens' s (CalendarState n) -> EventM n s () -> BrickEvent n e -> EventM n s ()
+appEventCalendarLens calendarState exitCalendar event = case event of
+  MouseDown n button modifiers _ -> handleMouseCalendar calendarState exitCalendar n button modifiers
+  VtyEvent vtyEvent -> handleKeyPressCalendar calendarState exitCalendar vtyEvent
+  _ -> pure ()
+-- appEventCalendarLens calendarState exitCalendar event = do
+--   mode <- calendarMode <$> gets (^. calendarState)
+--   case (mode, event) of
+--     (CalendarModeNormal, MouseDown n button modifiers _) -> handleMouseCalendarNormal calendarState exitCalendar n button modifiers
+--     (CalendarModeEditMonthYear, MouseDown n button modifiers _) -> handleMouseCalendarEditMonthYear calendarState n button modifiers
+--     (CalendarModeNormal, VtyEvent vtyEvent) -> handleKeyPressCalendarNormal calendarState exitCalendar vtyEvent
+--     (CalendarModeEditMonthYear, VtyEvent vtyEvent) -> handleKeyPressCalendarEditMonthYear calendarState vtyEvent
+--     _ -> pure ()
+
+appEventCalendar :: (s -> CalendarState n) -> (s -> CalendarState n -> s) -> EventM n s () -> BrickEvent n e -> EventM n s ()
+appEventCalendar getCalendar setCalendar = appEventCalendarLens (lens getCalendar setCalendar)

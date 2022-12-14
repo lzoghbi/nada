@@ -266,7 +266,7 @@ vp0Scroll = M.viewportScroll NadaVP
 
 nadaAppDraw :: NadaState -> [Widget Name]
 nadaAppDraw st = case _currentMode st of
-  ModeCalendar -> [drawCalendar (Calendar NadaCalendar) (Calendar . NadaCalendarDay) (_calendarState st)]
+  ModeCalendar -> [drawCalendar (_calendarState st)]
   _            -> [ui]
   where
     ui =
@@ -346,7 +346,7 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
                                                             else i
                                 return ()
   V.EvKey (V.KChar 'c') [] -> do
-                                freshCalendarState <- liftIO $ makeCalendarStateForCurrentDay
+                                freshCalendarState <- liftIO $ makeCalendarStateForCurrentDay nadaCalendarNameConverter
                                 todos <- gets getBareTodosByDate
                                 let cs = freshCalendarState{calendarWidgets = makeCalendarWidgets todos}
                                 modify (calendarState .~ cs)
@@ -420,7 +420,7 @@ appEvent ev = do
                   ModeEdit         -> appEventEdit ev
                   ModeEditTag      -> appEventEdit ev
                   ModeEditDeadline -> appEventEdit ev
-                  ModeCalendar     -> appEventCalendarLens calendarState nameToDay exitCalendar ev
+                  ModeCalendar     -> appEventCalendarLens calendarState exitCalendar ev
   where
     exitCalendar = modify (currentMode .~ ModeNormal)
 

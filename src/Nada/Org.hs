@@ -39,8 +39,8 @@ orgFileToNada :: O.OrgFile -> IO NadaState
 -- returning 'Nothing').
 -- Reserved 0 - 9 for other clickable widgets.
 orgFileToNada org = do
-  calendarState <- makeCalendarStateForCurrentDay
-  let (newState, assignedIds) = addTodosToState (defaultNadaStateFromCalendarState calendarState) correctlyParsedTodos
+  cs <- makeCalendarStateForCurrentDay nadaCalendarNameConverter
+  let (newState, assignedIds) = addTodosToState (defaultNadaStateFromCalendarState cs) correctlyParsedTodos
   pure (newState & (visibleTodoLists.ix 0.todoList) .~ Seq.fromList assignedIds
                  & allTags .~ Data.Set.toList tags)
   where

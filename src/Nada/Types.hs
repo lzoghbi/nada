@@ -16,23 +16,24 @@ import qualified Brick.Widgets.Edit as Ed
 import Lens.Micro
 import Lens.Micro.GHC ()
 import Lens.Micro.TH (makeLenses)
-import Nada.Calendar (CalendarState(..))
-
-data NadaCalendar
-  = NadaCalendar
-  | NadaCalendarDay Day
-  deriving (Eq, Show, Ord)
+import Nada.Calendar (CalendarState(..), CalendarName, CalendarNameConverter(..))
 
 data Name
   = TodoId Integer
   | TodoEditor
   | NadaVP
-  | Calendar NadaCalendar
+  | Calendar CalendarName
   deriving (Eq, Show, Ord)
 
-nameToDay :: Name -> Maybe Day
-nameToDay (Calendar (NadaCalendarDay d)) = Just d
-nameToday _ = Nothing
+nadaMatchCalendarName :: Name -> Maybe CalendarName
+nadaMatchCalendarName (Calendar cn) = Just cn
+nadaMatchCalendarName _ = Nothing
+
+nadaCalendarNameConverter :: CalendarNameConverter Name
+nadaCalendarNameConverter = CalendarNameConverter
+  { matchCalendarName = nadaMatchCalendarName
+  , toResourceName = Calendar
+  }
 
 data NadaPriority = High
                   | Medium 
