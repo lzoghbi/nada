@@ -1,16 +1,19 @@
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RankNTypes #-}
 module Nada.Calendar
   (
     drawCalendar
   , appEventCalendar
+  , appEventCalendarLens
   , CalendarState(..)
-  , WithCalendarName(..)
+  , CalendarName(..)
+  , CalendarNameConverter(..)
   , makeCalendarStateForCurrentDay
   -- * Exposed for testing
   , makeEmptyCalendarStateFromDay
   , calendarBlockRange
-  , firstMondayBefore
+  , firstDayOfWeekOnBefore
   , prevSelectedMonth
   , nextSelectedMonth
   , prevWeek
@@ -20,12 +23,10 @@ module Nada.Calendar
   ) where
 
 import Brick
-import Brick.Widgets.Center (center, hCenter)
+import Brick.Widgets.Center (hCenter)
 import Brick.Widgets.Border
-import Data.List (unfoldr)
-import Data.Map (Map(..))
-import qualified Data.Map as M
-import Data.Time (Day, dayOfWeek, DayOfWeek(..), getZonedTime, zonedTimeToLocalTime, localDay)
+import Data.List (intersperse)
+import Data.Time (getZonedTime, zonedTimeToLocalTime, localDay)
 import Data.Time.Calendar
 import Data.Time.Calendar.Month
 import Data.Time.Format
@@ -33,55 +34,66 @@ import Data.Time.Format
 import qualified Graphics.Vty as V
 import qualified Graphics.Vty.Input.Events as E
 
-import Lens.Micro
+import Lens.Micro ( (%~), (^.), Lens', lens)
 
 data CalendarName
-  = CalendarDay Day
-  deriving (Eq, Show, Ord)
+  = CalendarBody -- ^ As of now, this is unused.
+  | CalendarDate Day -- ^ A date, rendered as a cell in the calendar grid.
+  | CalendarMonth MonthOfYear -- ^ The month, rendered on the top left.
+  | CalendarYear Year -- ^ The year, rendered on the top left.
+  | CalendarNextMonth -- ^ The next month button, rendered on the top right.
+  | CalendarPrevMonth -- ^ The prev month button, rendered on the top right.
+  deriving (Show, Eq, Ord)
 
-data WithCalendarName name
-  = CalendarName CalendarName
-  | OtherName name
-  deriving (Eq, Show, Ord)
-
-type Name n = (Eq n, Show n, Ord n)
-type CS n = CalendarState (WithCalendarName n)
-type W n = Widget (WithCalendarName n)
-
-calendarDayName :: (Name n) => Day -> WithCalendarName n
-calendarDayName = CalendarName . CalendarDay
+data CalendarNameConverter resourceName
+  = CalendarNameConverter
+  { toResourceName :: CalendarName -> resourceName
+  , matchCalendarName :: resourceName -> Maybe CalendarName
+  }
 
 data CalendarState resourceName
   = CalendarState
   { calendarSelectedDate  :: Day
   , calendarSelectedMonth :: Month
-  , calendarWidgets :: Map Day [Widget resourceName]
+  , calendarWidgets :: Day -> [Widget resourceName]
+  , calendarNameConverter :: CalendarNameConverter resourceName
   }
 
-makeEmptyCalendarStateFromDay :: Day -> CalendarState n
-makeEmptyCalendarStateFromDay day = CalendarState day (dayPeriod day) mempty
+makeEmptyCalendarStateFromDay :: CalendarNameConverter n -> Day -> CalendarState n
+makeEmptyCalendarStateFromDay cn day = CalendarState day (dayPeriod day) mempty cn
 
-makeCalendarStateForCurrentDay :: IO (CalendarState n)
-makeCalendarStateForCurrentDay = do
+makeCalendarStateForCurrentDay :: CalendarNameConverter n -> IO (CalendarState n)
+makeCalendarStateForCurrentDay cn = do
   now <- getZonedTime
   let day = localDay $ zonedTimeToLocalTime now
-  pure $ makeEmptyCalendarStateFromDay day
- 
+  pure $ makeEmptyCalendarStateFromDay cn day
 
-drawCalendar :: Name n => CS n -> W n
+drawCalendar :: Ord n => CalendarState n -> Widget n
 drawCalendar state@CalendarState{..} = header <=> drawCalendarBody state <=> footer
   where
-    YearMonth yearNumber _ = calendarSelectedMonth
-    monthName = formatTime defaultTimeLocale "%B" calendarSelectedMonth
-    header = str monthName <+> str " " <+> str (show yearNumber)
+    YearMonth y m = calendarSelectedMonth
+    monthStr = formatTime defaultTimeLocale "%B" calendarSelectedMonth
+    yearStr = formatTime defaultTimeLocale "%Y" calendarSelectedMonth
+    monthName = toResourceName calendarNameConverter . CalendarMonth $ m
+    yearName = toResourceName calendarNameConverter . CalendarYear $ y
+    -- Ensures all months are of the same visual length and
+    -- that the year doesn't get cut off by the month selector
+    month = clickable monthName . hLimit 9 $ str monthStr
+    year = clickable yearName $ str yearStr
+    monthYear = str " " <+> month <+> str " " <+> year
+    prevMonthName = toResourceName calendarNameConverter CalendarPrevMonth
+    nextMonthName = toResourceName calendarNameConverter CalendarNextMonth
+    monthButtons = clickable prevMonthName (str "←") <+> str "  " <+> clickable nextMonthName (str "→")
+    -- Ensures that the fills do not occupy vertical space
+    header = vLimit 1 (monthYear <+> fill ' ' <+> monthButtons)
     footer = str "[j]: Down [k]: Up [h]: Left [l]: Right [C-u]: Prev month [C-d]: Next month [q/<Esc>]: Exit"
 
-drawCalendarBody :: Name n => CS n -> W n
-drawCalendarBody state@CalendarState{..} = joinBorders . vBox $ 
+drawCalendarBody :: Ord n => CalendarState n -> Widget n
+drawCalendarBody state@CalendarState{..} = joinBorders . border . vBox . intersperse hBorder $
   weekHeader 
   : map (drawWeek state) weeks
   where
-    weekHeader = hBox $ map (border . hCenter . str)
+    weekHeader = vLimit 1 . hBox . intersperse vBorder $ map (hCenter . str)
       [ "MON"
       , "TUE"
       , "WED"
@@ -92,41 +104,37 @@ drawCalendarBody state@CalendarState{..} = joinBorders . vBox $
       ]
     weeks = chunksOf 7 (calendarBlock calendarSelectedMonth)
 
-drawWeek :: Name n => CS n -> [Day] -> W n
-drawWeek state days = hBox $ map (drawDay state) days
+drawWeek :: Ord n => CalendarState n -> [Day] -> Widget n
+drawWeek state days = hBox . intersperse vBorder $ map (drawDay state) days
 
-drawDay :: Name n => CS n -> Day -> W n
-drawDay CalendarState{..} day = addSelectionHighlight . border . clickable (calendarDayName day) $ 
-  case widgets of
-    Nothing -> dayWidget
-    Just ws -> dayWidget <=> ws
+drawDay :: Ord n => CalendarState n -> Day -> Widget n
+drawDay CalendarState{..} day = addSelectionHighlight . clickable widgetName $
+    dayWidget <=> widgets <=> fill ' '
   where
     YearMonthDay _ _ dayOfMonth = day
     month = dayPeriod day
     monthShortName = formatTime defaultTimeLocale "%b" month
-    dayWidget = case month == calendarSelectedMonth of
-      True  -> hCenter . str $ show dayOfMonth
-      False -> hCenter . str $ monthShortName <> " " <> show dayOfMonth
+    dayWidget = if month == calendarSelectedMonth
+      then hCenter . str $ show dayOfMonth
+      else hCenter . str $ monthShortName <> " " <> show dayOfMonth
     addSelectionHighlight
       | calendarSelectedDate == day = forceAttr $ attrName "selected"
       | otherwise = id
-    widgets = vBox <$> M.lookup day calendarWidgets
+    widgets = vBox $ calendarWidgets day
+    widgetName = toResourceName calendarNameConverter . CalendarDate $ day
 
--- | Gets the first Monday before the date. Returns the date if it is a Monday.
-firstMondayBefore :: Day -> Day
-firstMondayBefore day = case dayOfWeek day of
-  Monday -> day
-  _      -> firstMondayBefore (pred day)
+-- Modified defintion of 'firstDayOfWeekOnAfter'.
+firstDayOfWeekOnBefore :: DayOfWeek -> Day -> Day
+firstDayOfWeekOnBefore dw d = addDays (negate . toInteger $ dayOfWeekDiff (dayOfWeek d) dw) d
 
 calendarBlockRange :: Month -> (Day, Day)
 -- We will at least add 27 to accommodate the shortest months, but we might need
 -- to add more to accommodate longer months.
 calendarBlockRange month = (firstMonday, lastDate (addDays 27 firstMonday))
   where
-    firstMonday = firstMondayBefore $ periodFirstDay month
-    lastOfMonth = periodLastDay month
+    firstMonday = firstDayOfWeekOnBefore Monday $ periodFirstDay month
     lastDate d
-      | d >= lastOfMonth = d
+      | d >= periodLastDay month = d
       | otherwise = lastDate (addDays 7 d)
 
 calendarBlock :: Month -> [Day]
@@ -140,19 +148,83 @@ chunksOf n xs = chunk : chunksOf n rest
   where
     (chunk, rest) = splitAt n xs
 
--- | Adjusts the day and changes the selected month if the day is out of bounds.
+indexInCalendarBlockRange :: Day -> Month -> Integer
+indexInCalendarBlockRange day month = diffDays day start
+  where
+    (start, _end) = calendarBlockRange month
+
+dayFromCalendarBlockRangeIndex :: Month -> Integer -> Day
+dayFromCalendarBlockRangeIndex month i = addDays i start
+  where
+    (start, _end) = calendarBlockRange month
+
+-- | To be used in 'nextMonth' and 'prevMonth'.
+-- The idea here is that if your date is the last Thursday (index 38) in a block with 6 weeks = 42 days
+-- but you want to skip to a block with 3 weeks = 35 days, the natural thing to do is to select the
+-- last Thursday of the next block (index 31). The other option is to simply clamp at the maximum, but
+-- that would look weird.
+clampIndexToBlockRange :: Month -> Integer -> Integer
+clampIndexToBlockRange month = clampIndex
+  where
+    (start, end) = calendarBlockRange month
+    blockRangeMaxIndex = diffDays end start
+    clampIndex i
+      | i <= blockRangeMaxIndex = i
+      | otherwise = clampIndex (i - 7)
+
+-- | Adjusts the day. If it exits the current calendar block, clamps to the
+-- start/end of the preceding/following calendar block, respectively. Meant to
+-- only be used in 'prevDay' and 'nextDay'.
 adjustDay :: (Day -> Day) -> CalendarState n -> CalendarState n
-adjustDay adjustment state@CalendarState{..} = if adjustedDay < currentBlockStart || adjustedDay > currentBlockEnd
-  then
-    -- Note that it does not suffice to always set the selected month to the
-    -- corresponding month of 'adjustedDay' because block ranges generally
-    -- contain multiple months.
-    state{calendarSelectedDate = adjustedDay, calendarSelectedMonth = dayPeriod adjustedDay}
-  else
-    state{calendarSelectedDate = adjustedDay}
+adjustDay adjustment state@CalendarState{..} =
+  if
+    | adjustedDay < currentBlockStart -> state{calendarSelectedDate = newBlockEnd, calendarSelectedMonth = newMonth}
+    | adjustedDay > currentBlockEnd   -> state{calendarSelectedDate = newBlockStart, calendarSelectedMonth = newMonth}
+    | otherwise                       -> state{calendarSelectedDate = adjustedDay}
   where
     (currentBlockStart, currentBlockEnd) = calendarBlockRange calendarSelectedMonth
     adjustedDay = adjustment calendarSelectedDate
+    newMonth = dayPeriod adjustedDay
+    (newBlockStart, newBlockEnd) = calendarBlockRange newMonth
+
+-- | Adjusts the week. If it exits the current calendar block, finds the first/last
+-- day with the same day of the week as the current selected date. This ensures that
+-- movement is seamless between blocks.
+adjustWeek :: (Day -> Day) -> CalendarState n -> CalendarState n
+adjustWeek adjustment state@CalendarState{..} =
+  if
+    | adjustedDay < currentBlockStart -> state{ calendarSelectedDate =
+                                                firstDayOfWeekOnBefore currentDayOfWeek newBlockEnd
+                                              , calendarSelectedMonth = newMonth
+                                              }
+    | adjustedDay > currentBlockEnd   -> state{ calendarSelectedDate =
+                                                firstDayOfWeekOnAfter  currentDayOfWeek newBlockStart
+                                              , calendarSelectedMonth = newMonth
+                                              }
+    | otherwise                       -> state{ calendarSelectedDate = adjustedDay }
+  where
+    (currentBlockStart, currentBlockEnd) = calendarBlockRange calendarSelectedMonth
+    currentDayOfWeek = dayOfWeek calendarSelectedDate
+    adjustedDay = adjustment calendarSelectedDate
+    newMonth = dayPeriod adjustedDay
+    (newBlockStart, newBlockEnd) = calendarBlockRange newMonth
+
+-- | Changes both selected month and selected day, attempting to preserve the
+-- index of the day in the block range (not the date itself).  Keeps the same
+-- day of the week when selected date's relative index exceeds the bounds of the
+-- next month (see 'clampIndexToBlockRange').
+adjustMonth :: (Month -> Month) -> CalendarState n -> CalendarState n
+adjustMonth adjustment state@CalendarState{..} = state{calendarSelectedMonth = newMonth, calendarSelectedDate = newDay}
+  where
+    newMonth = adjustment calendarSelectedMonth
+    newIndex = clampIndexToBlockRange newMonth $ indexInCalendarBlockRange calendarSelectedDate calendarSelectedMonth
+    newDay = dayFromCalendarBlockRangeIndex newMonth newIndex
+
+prevSelectedYear :: CalendarState n -> CalendarState n
+prevSelectedYear state@CalendarState{..} = state{calendarSelectedMonth = addMonths (-12) calendarSelectedMonth}
+
+nextSelectedYear :: CalendarState n -> CalendarState n
+nextSelectedYear state@CalendarState{..} = state{calendarSelectedMonth = addMonths 12 calendarSelectedMonth}
 
 -- | Does not change the selected day
 prevSelectedMonth :: CalendarState n -> CalendarState n
@@ -162,18 +234,23 @@ prevSelectedMonth state@CalendarState{..} = state{calendarSelectedMonth = pred c
 nextSelectedMonth :: CalendarState n -> CalendarState n
 nextSelectedMonth state@CalendarState{..} = state{calendarSelectedMonth = succ calendarSelectedMonth}
 
--- FIXME: Need to keep the same relative location in the calendarBlock
--- nextMonth :: CalendarState n -> CalendarState n
--- nextMonth state@CalendarState{..} = state{calendarSelectedMonth = succ calendarSelectedMonth, calendarSelectedDate = addDays 28 calendarSelectedDate}
--- 
--- prevMonth :: CalendarState n -> CalendarState n
--- prevMonth state@CalendarState{..} = state{calendarSelectedMonth = pred calendarSelectedMonth, calendarSelectedDate = addDays (-28) calendarSelectedDate}
+nextYear :: CalendarState n -> CalendarState n
+nextYear = adjustMonth (addMonths 12)
+
+prevYear :: CalendarState n -> CalendarState n
+prevYear = adjustMonth (addMonths (-12))
+
+nextMonth :: CalendarState n -> CalendarState n
+nextMonth = adjustMonth succ
+
+prevMonth :: CalendarState n -> CalendarState n
+prevMonth = adjustMonth pred
 
 prevWeek :: CalendarState n -> CalendarState n
-prevWeek = adjustDay (addDays (-7))
+prevWeek = adjustWeek (addDays (-7))
 
 nextWeek :: CalendarState n -> CalendarState n
-nextWeek = adjustDay (addDays 7)
+nextWeek = adjustWeek (addDays 7)
 
 prevDay :: CalendarState n -> CalendarState n
 prevDay = adjustDay pred
@@ -181,32 +258,58 @@ prevDay = adjustDay pred
 nextDay :: CalendarState n -> CalendarState n
 nextDay = adjustDay succ
 
-appEventCalendar :: Name n => EventM (WithCalendarName n) s () -> ASetter' s (CalendarState (WithCalendarName n)) -> BrickEvent (WithCalendarName n) e -> EventM (WithCalendarName n) s ()
--- Select cell
-appEventCalendar _ calendarStateSetter (MouseDown (CalendarName (CalendarDay day)) E.BLeft _ _) = 
-  modify (calendarStateSetter %~ (\state -> state{calendarSelectedDate = day}))
--- Scroll through weeks
-appEventCalendar _ calendarStateSetter (MouseDown _ E.BScrollDown _ _) =
-  modify (calendarStateSetter %~ nextSelectedMonth)
-appEventCalendar _ calendarStateSetter (MouseDown _ E.BScrollUp   _ _) =
-  modify (calendarStateSetter %~ prevSelectedMonth)
--- Move across days
-appEventCalendar exitCalendar calendarStateSetter (VtyEvent vtyE) = case vtyE of
+handleMouseCalendar :: Lens' s (CalendarState n) -> EventM n s () -> n -> V.Button -> [V.Modifier] -> EventM n s ()
+handleMouseCalendar calendarState _exitCalendar n button modifiers = do
+  CalendarNameConverter{..} <- calendarNameConverter <$> gets (^. calendarState)
+  case (button, modifiers) of
+    (E.BLeft, _) ->
+      case matchCalendarName n of
+        Just (CalendarDate day) -> modify (calendarState %~ \state -> state{calendarSelectedDate = day})
+        Just CalendarNextMonth  -> modify (calendarState %~ nextSelectedMonth)
+        Just CalendarPrevMonth  -> modify (calendarState %~ prevSelectedMonth)
+        _ -> pure ()
+    (E.BScrollDown, [V.MShift]) -> modify (calendarState %~ nextSelectedYear)
+    (E.BScrollDown, _) ->
+      case matchCalendarName n of
+        Just (CalendarYear _) -> modify (calendarState %~ nextSelectedYear)
+        _ -> modify $ calendarState %~ nextSelectedMonth
+    (E.BScrollUp, [V.MShift]) -> modify (calendarState %~ prevSelectedYear)
+    (E.BScrollUp, _) ->
+      case matchCalendarName n of
+        Just (CalendarYear _) -> modify (calendarState %~ prevSelectedYear)
+        _ -> modify $ calendarState %~ prevSelectedMonth
+    _ -> pure ()
+
+handleKeyPressCalendar :: Lens' s (CalendarState n) -> EventM n s () -> V.Event -> EventM n s ()
+handleKeyPressCalendar calendarState exitCalendar vtyEvent = case vtyEvent of
   V.EvKey (V.KChar 'j') [] ->
-    modify (calendarStateSetter %~ nextWeek)
+    modify $ calendarState %~ nextWeek
   V.EvKey (V.KChar 'k') [] ->
-    modify (calendarStateSetter %~ prevWeek)
+    modify $ calendarState %~ prevWeek
   V.EvKey (V.KChar 'h') [] ->
-    modify (calendarStateSetter %~ prevDay)
+    modify $ calendarState %~ prevDay
   V.EvKey (V.KChar 'l') [] ->
-    modify (calendarStateSetter %~ nextDay)
+    modify $ calendarState %~ nextDay
   V.EvKey (V.KChar 'd') [V.MCtrl] ->
-    modify (calendarStateSetter %~ nextSelectedMonth)
+    modify $ calendarState %~ nextMonth
   V.EvKey (V.KChar 'u') [V.MCtrl] ->
-    modify (calendarStateSetter %~ prevSelectedMonth)
+    modify $ calendarState %~ prevMonth
+  V.EvKey (V.KChar 'f') [V.MCtrl] ->
+    modify $ calendarState %~ nextYear
+  V.EvKey (V.KChar 'b') [V.MCtrl] ->
+    modify $ calendarState %~ prevYear
   V.EvKey (V.KChar 'q') [] ->
     exitCalendar
   V.EvKey V.KEsc [] ->
     exitCalendar
   _ -> pure ()
-appEventCalendar _ _ _ = pure ()
+
+-- | Specialized version of 'appEventCalendar' that uses a lens instead of a getter and setter.
+appEventCalendarLens :: Lens' s (CalendarState n) -> EventM n s () -> BrickEvent n e -> EventM n s ()
+appEventCalendarLens calendarState exitCalendar event = case event of
+  MouseDown n button modifiers _ -> handleMouseCalendar calendarState exitCalendar n button modifiers
+  VtyEvent vtyEvent -> handleKeyPressCalendar calendarState exitCalendar vtyEvent
+  _ -> pure ()
+
+appEventCalendar :: (s -> CalendarState n) -> (s -> CalendarState n -> s) -> EventM n s () -> BrickEvent n e -> EventM n s ()
+appEventCalendar getCalendar setCalendar = appEventCalendarLens (lens getCalendar setCalendar)

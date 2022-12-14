@@ -14,6 +14,7 @@ import Data.Time.Calendar.OrdinalDate
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
+import Nada.Calendar (firstDayOfWeekOnBefore)
 
 newtype TestCalendarState n = TestCalendarState (CalendarState n)
 
@@ -37,9 +38,9 @@ genMonth = MkMonth <$> chooseInteger (1, 100000)
 genCalendarState :: QC.Gen (TestCalendarState n)
 genCalendarState = TestCalendarState . makeEmptyCalendarStateFromDay <$> genDay
 
-propFirstMondayBeforeValid :: Property
-propFirstMondayBeforeValid = forAll genDay $ \day ->
-  let monday = firstMondayBefore day
+propFirstDayOfWeekOnBeforeValid :: Property
+propFirstDayOfWeekOnBeforeValid = forAll genDay $ \day ->
+  let monday = firstDayOfWeekOnBefore Monday day
    in -- Is a Monday
       dayOfWeek monday == Monday
       -- Is the first preceding
@@ -76,7 +77,7 @@ propPrevNextDayInverse = forAll genCalendarState $ \(TestCalendarState cs) ->
   (calendarSelectedDate cs) == (calendarSelectedDate . prevDay . nextDay $ cs)
 
 propertyTests = testGroup "Property tests"
-  [ QC.testProperty "firsMondayBefore" propFirstMondayBeforeValid
+  [ QC.testProperty "firstDayOfWeekOnBefore" propFirstDayOfWeekOnBeforeValid
   , QC.testProperty "calendarBlockRange" propCalendarBlockRangeValid
   , QC.testProperty "prevSelectedMonth . nextSelectedMonth == id" propPrevNextSelectedMonthInverse
   , QC.testProperty "nextSelectedMonth does not change selected date" propPrevNextMonthDoesNotChangeDay
