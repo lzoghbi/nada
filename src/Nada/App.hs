@@ -3,6 +3,7 @@
 
 module Nada.App (
   nadaApp
+  , idToBinding
 ) where
 
 import Nada.Types
@@ -282,30 +283,33 @@ nadaAppDraw st = case _currentMode st of
         , shortcutModifyInfoBar
         , shortcutInfoBar
         ]
+    kbs = keybindings (st ^. keyToId) idToBinding Nothing
 
-kbs :: KeyBindings Name NadaState
-kbs = keybindings keyToId idToBinding Nothing
-  where
-    idToBinding = Map.fromList
-      [ ("quit", keyBind halt (Just "Quit") (Just "Exits the app") True)
-      , ("up", keyBind moveUp (Just "Move up") Nothing True)
-      , ("down", keyBind moveDown (Just "Move down") Nothing True)
-      , ("help", keyBind helpMenu (Just "Help menu") Nothing True)
-      ]
-    keyToId = Map.fromList
-      [ (V.EvKey (V.KChar 'q') [], "quit")
-      , (V.EvKey (V.KChar 'd') [V.MCtrl], "down")
-      , (V.EvKey V.KDown [], "down")
-      , (V.EvKey (V.KChar 'u') [V.MCtrl], "up")
-      , (V.EvKey V.KUp [], "up")
-      , (V.EvKey (V.KChar '?') [], "help")
-      ]
+idToBinding :: Map Text (KeyBind Name NadaState)
+idToBinding = Map.fromList
+  [ ("quit", keyBind halt (Just "Quit") (Just "Exits the app") True)
+  , ("up", keyBind moveUp (Just "Move up") Nothing True)
+  , ("down", keyBind moveDown (Just "Move down") Nothing True)
+  , ("help", keyBind helpMenu (Just "Help menu") Nothing True)
+  ]
+    -- keyToId = Map.fromList
+    --   [ (V.EvKey (V.KChar 'q') [], "quit")
+    --   , (V.EvKey (V.KChar 'd') [V.MCtrl], "down")
+    --   , (V.EvKey V.KDown [], "down")
+    --   , (V.EvKey (V.KChar 'u') [V.MCtrl], "up")
+    --   , (V.EvKey V.KUp [], "up")
+    --   , (V.EvKey (V.KChar '?') [], "help")
+    --   ]
 
 appEventNormal :: BrickEvent Name e -> EventM Name NadaState ()
 -- Scroll for Task Viewport
 appEventNormal (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1
 appEventNormal (MouseDown _ E.BScrollUp _ _) = M.vScrollBy vp0Scroll (-1)
-appEventNormal (VtyEvent vtyE) = appEventKeyBinds kbs vtyE
+appEventNormal (VtyEvent vtyE) = do
+  keyToId <- gets (^. keyToId)
+  appEventKeyBinds (makeKbs keyToId) vtyE
+  where
+    makeKbs keyToId = keybindings keyToId idToBinding Nothing
 -- Keyboard Shortcuts
 appEventNormal (VtyEvent vtyE) = case vtyE of
   V.EvKey (V.KChar 'q') [] -> do

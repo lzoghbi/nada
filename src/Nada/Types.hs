@@ -5,6 +5,7 @@
 module Nada.Types where
 
 import Data.Foldable (toList)
+import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import Data.Text
@@ -12,12 +13,14 @@ import Data.Time (Day, showGregorian)
 import Data.Time.Clock.System (systemEpochDay)
 
 import qualified Brick.Widgets.Edit as Ed
+import qualified Graphics.Vty.Input.Events as V
 
 import Lens.Micro
 import Lens.Micro.GHC ()
 import Lens.Micro.TH (makeLenses)
 import Data.Time (Day)
 import Nada.Calendar (CalendarState(..), WithCalendarName(..))
+import qualified Graphics.Vty as V
 
 data NadaName = TodoId Integer
               | TodoEditor
@@ -75,6 +78,7 @@ data NadaState = NadaState
   , _allTags :: [Text]
   -- , _filterText :: Text
   , _calendarState :: CalendarState Name
+  , _keyToId :: Map V.Event Text
   }
 
 makeLenses ''Todo
@@ -115,6 +119,7 @@ defaultNadaStateFromCalendarState calendarState = NadaState {
 , _currentMode = ModeNormal
 , _calendarState = calendarState
 , _allTags = []
+, _keyToId = mempty
 }
 
 -- Set the ID of a Todo, updating also the ID of the Editor inside

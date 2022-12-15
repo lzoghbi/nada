@@ -13,13 +13,12 @@ module Nada.KeyBinds
 import Nada.KeyBinds.KeyCodes
 
 import Brick
-import Brick.Widgets.Border (border, hBorder)
+import Brick.Widgets.Border (border)
 import Brick.Widgets.Center (centerLayer)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
-import Control.Monad.State
 
 import qualified Graphics.Vty as V
 
@@ -88,7 +87,7 @@ keybindings keyToId idToBinding defaultEvent = KeyBindings idToBindingWithKeys k
 drawHelpMenu :: Ord n => KeyBindings n s -> Widget n
 drawHelpMenu kbs = centerLayer . border $ header <=> vBox keyBinds
   where
-    header = str "Key Bindings" <=> hBorder
+    header = str "Key Bindings"
     keyBinds = map (uncurry drawKeyBind) $ M.assocs (keybindingsIdToBinding kbs)
 
 drawKeyBind :: Id -> KeyBind n s -> Widget n
@@ -98,8 +97,8 @@ drawKeyBind ident KeyBind{..} = (keybinds <+> str ": " <+> name) <=> desc
   where
     name = txt $ fromMaybe ident kbName
     desc = maybe emptyWidget txt kbDesc
-    keybinds = str . unwords $ mapMaybe renderKey kbKeys
-    renderKey = fmap wrapWithBrackets . renderUserInputEvent
+    keybinds = str . unwords $ mapMaybe showKey kbKeys
+    showKey = fmap wrapWithBrackets . showUserInputEvent
     wrapWithBrackets s = "[" <> s <> "]"
 
 appEventKeyBinds :: Ord n => KeyBindings n s -> V.Event -> EventM n s ()
@@ -110,5 +109,5 @@ appEventKeyBinds (KeyBindings events ids defaultEventMaybe) event =
   where
     defaultEvent = fromMaybe (pure ()) defaultEventMaybe
 
--- TODO: add parsing of 'keybindIds' from a config file
+-- TODO: Make IdToBinding an ordered map.
 -- TODO: Figure out how to support key bindings in a named context (i.e. BrickEvent n ()).

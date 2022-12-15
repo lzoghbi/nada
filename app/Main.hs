@@ -5,6 +5,8 @@ module Main (main) where
 
 import qualified Brick
 import qualified Brick.Widgets.Edit as Ed
+import Data.Map (Map)
+import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.Org as O
 import qualified Data.Sequence as Seq
@@ -15,10 +17,13 @@ import Lens.Micro
 import Nada.Types hiding (Edit)
 import Nada.App
 import Nada.Org
+import Nada.KeyBinds.IniParser
 import Nada.Types
 import Options.Applicative
 import System.Environment (lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
+
+import qualified Graphics.Vty.Input.Events as V
 
 -- For getting the error message when parsing the org file
 import Text.Megaparsec (errorBundlePretty, parse)
@@ -119,8 +124,8 @@ openNadaFile filePath = do
       putStrLn (errorBundlePretty parseError)
       exitFailure
 
-edit :: FilePath -> Text -> IO ()
-edit filePath filterText = do
+edit :: FilePath -> Text -> Map V.Event Text -> IO ()
+edit filePath filterText keyToId = do
   nadaState <- openNadaFile filePath
   let moreTodoList = defaultTodoList & todoListName .~ "More todos"
                                      & todoList .~ Seq.fromList (getAllTodoIds nadaState)
@@ -131,10 +136,11 @@ edit filePath filterText = do
   --                                     & todoList .~ Seq.fromList (getListIds $ activeTodos nadaState)
 
   let nadaState'  = addTodoListToState moreTodoList nadaState
+  let nadaState'' = nadaState'{_keyToId = keyToId}
   -- let nadaState'' = addTodoListToState activeList nadaState'
   -- Ignoring the filter text for now
   -- finalNadaState <- Brick.defaultMain nadaApp nadaState{_filterText = filterText}
-  finalNadaState <- Brick.defaultMain nadaApp nadaState'
+  finalNadaState <- Brick.defaultMain nadaApp nadaState''
   Text.writeFile filePath (O.prettyOrgFile $ nadaToOrgFile finalNadaState)
   exitSuccess
 
@@ -203,14 +209,19 @@ complete _ _ = return ()
 
 main :: IO ()
 main = do
-  defaultNadaFile <- lookupEnv "NADA_FILE"
-  (argNadaFile, comm) <- execParser opts
-  let maybeNadaFile = argNadaFile <|> defaultNadaFile
-  case (maybeNadaFile, comm) of
-    (Nothing, _) -> do
-      putStrLn "No file specified, please specify a file using --file or the environmental variable NADA_FILE. For more information run"
-      putStrLn "  nada --help"
-      exitFailure
-    (Just nadaFile, Edit filterText) -> edit nadaFile filterText
-    (Just nadaFile, Add todo date todoPrio tags todoDesc) -> add nadaFile todo date todoPrio tags todoDesc
-    (Just nadaFile, Complete queryText) -> complete nadaFile queryText
+  configFile <- Text.readFile "nada.ini"
+  let keyToIdEither = parseKeyBindsFromFile configFile "KEYS" "," (M.keys idToBinding)
+  case keyToIdEither of
+    Left err -> putStrLn "Error reading config file:" *> putStrLn err
+    Right keyToId -> do
+      defaultNadaFile <- lookupEnv "NADA_FILE"
+      (argNadaFile, comm) <- execParser opts
+      let maybeNadaFile = argNadaFile <|> defaultNadaFile
+      case (maybeNadaFile, comm) of
+        (Nothing, _) -> do
+          putStrLn "No file specified, please specify a file using --file or the environmental variable NADA_FILE. For more information run"
+          putStrLn "  nada --help"
+          exitFailure
+        (Just nadaFile, Edit filterText) -> edit nadaFile filterText keyToId
+        (Just nadaFile, Add todo date todoPrio tags todoDesc) -> add nadaFile todo date todoPrio tags todoDesc
+        (Just nadaFile, Complete queryText) -> complete nadaFile queryText

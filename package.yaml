@@ -37,6 +37,7 @@ dependencies:
 - time >= 1.12.2
 - word-wrap
 - text-zipper
+- config-ini
 
 ghc-options:
 - -Wall
