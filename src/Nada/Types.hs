@@ -40,7 +40,7 @@ data NadaPriority = High
                   | Low 
    deriving (Eq, Show)
 
-data NadaMode = ModeNormal | ModeEdit | ModeEditTag | ModeEditDeadline | ModeCalendar
+data NadaMode = ModeNormal | ModeEdit | ModeEditTag | ModeEditDeadline | ModeCalendar | ModeShowHelpMenu
   deriving (Eq, Show)
 
 data Todo = Todo

@@ -2,11 +2,12 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Nada.App (
-  nadaApp,
+  nadaApp
 ) where
 
 import Nada.Types
 import Nada.Calendar
+import Nada.KeyBinds
 
 import Data.List (intersperse)
 import Data.Text (Text, pack, unpack, lines, unlines, words, unwords, isInfixOf)
@@ -271,6 +272,7 @@ vp0Scroll = M.viewportScroll mkNadaVP
 nadaAppDraw :: NadaState -> [Widget Name]
 nadaAppDraw st = case _currentMode st of
   ModeCalendar -> [drawCalendar (_calendarState st)]
+  ModeShowHelpMenu -> [drawHelpMenu kbs, ui]
   _            -> [ui]
   where
     ui =
@@ -281,10 +283,29 @@ nadaAppDraw st = case _currentMode st of
         , shortcutInfoBar
         ]
 
+kbs :: KeyBindings Name NadaState
+kbs = keybindings keyToId idToBinding Nothing
+  where
+    idToBinding = Map.fromList
+      [ ("quit", keyBind halt (Just "Quit") (Just "Exits the app") True)
+      , ("up", keyBind moveUp (Just "Move up") Nothing True)
+      , ("down", keyBind moveDown (Just "Move down") Nothing True)
+      , ("help", keyBind helpMenu (Just "Help menu") Nothing True)
+      ]
+    keyToId = Map.fromList
+      [ (V.EvKey (V.KChar 'q') [], "quit")
+      , (V.EvKey (V.KChar 'd') [V.MCtrl], "down")
+      , (V.EvKey V.KDown [], "down")
+      , (V.EvKey (V.KChar 'u') [V.MCtrl], "up")
+      , (V.EvKey V.KUp [], "up")
+      , (V.EvKey (V.KChar '?') [], "help")
+      ]
+
 appEventNormal :: BrickEvent Name e -> EventM Name NadaState ()
 -- Scroll for Task Viewport
 appEventNormal (MouseDown _ E.BScrollDown _ _) = M.vScrollBy vp0Scroll 1
 appEventNormal (MouseDown _ E.BScrollUp _ _) = M.vScrollBy vp0Scroll (-1)
+appEventNormal (VtyEvent vtyE) = appEventKeyBinds kbs vtyE
 -- Keyboard Shortcuts
 appEventNormal (VtyEvent vtyE) = case vtyE of
   V.EvKey (V.KChar 'q') [] -> do
@@ -376,6 +397,23 @@ appEventNormal (VtyEvent vtyE) = case vtyE of
   _ -> return ()
 appEventNormal _ = return ()
 
+moveDown :: EventM Name NadaState ()
+moveDown = do
+  listIdx <- use selectedTodoList
+  zoom (visibleTodoLists . ix (fromInteger listIdx)) $
+    do
+      tdList <- use todoList
+      selectedTodo %= min (toInteger $ length tdList - 1) . (+ 1)
+
+moveUp :: EventM Name NadaState ()
+moveUp = do
+  listIdx <- use selectedTodoList
+  zoom (visibleTodoLists . ix (fromInteger listIdx)) $
+    selectedTodo %= max 0 . subtract 1
+
+helpMenu :: EventM Name NadaState ()
+helpMenu = currentMode .= ModeShowHelpMenu
+
 -- FIXME: This is horrific
 getBareTodosByDate :: NadaState -> [(Day, Widget Name)]
 getBareTodosByDate st = do
@@ -394,6 +432,10 @@ getBareTodosByDate st = do
 
 addToCalendarWidgets :: [(Day, Widget Name)] -> Map Day [Widget Name]
 addToCalendarWidgets = foldr (\(day, widget) m -> Map.insertWith (<>) day [widget] m) mempty
+
+appEventShowHelpMenu :: BrickEvent Name e -> EventM Name NadaState ()
+appEventShowHelpMenu (VtyEvent (V.EvKey _ _)) = currentMode .= ModeNormal
+appEventShowHelpMenu _ = pure ()
 
 appEventEdit :: BrickEvent Name e -> EventM Name NadaState ()
 appEventEdit ev = case ev of
@@ -423,7 +465,7 @@ appEvent ev = do
                   ModeEditTag      -> appEventEdit ev
                   ModeEditDeadline -> appEventEdit ev
                   ModeCalendar     -> appEventCalendar exitCalendar calendarState ev
-                  _                -> return ()
+                  ModeShowHelpMenu -> appEventShowHelpMenu ev
   where
     exitCalendar = modify (currentMode .~ ModeNormal)
 

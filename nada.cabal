@@ -27,6 +27,8 @@ library
   exposed-modules:
       Nada.App
       Nada.Calendar
+      Nada.KeyBinds
+      Nada.KeyBinds.KeyCodes
       Nada.Org
       Nada.Types
   other-modules:
