@@ -1,6 +1,7 @@
 module Nada.KeyBinds.KeyCodes
   (
-    showUserInputEvent
+    KeyCode
+  , showKeyCode
   , parseKeyCode
   ) where
 
@@ -12,15 +13,21 @@ import Control.Applicative ((<|>))
 import Data.Bifunctor (first)
 import Graphics.Vty.Input.Events
 
+-- | Technically KeyCodes are a subset of 'Event', but since this library
+-- is specifically for Brick we're using the event itself for convenience.
+-- It could easily be changed, though.
+type KeyCode = Event
+
 -- | Displays the keycode notation for the user input event.
 -- Notation is somewhat arbitrary... sorry.
 -- Returns 'Nothing' if the event isn't a user input event
 -- (e.g. 'EvResize').
-showUserInputEvent :: Event -> Maybe String
-showUserInputEvent event = case event of
+showKeyCode :: KeyCode -> Maybe String
+showKeyCode keyCode = case keyCode of
   EvKey key modifiers -> Just $ showModifiers modifiers <> showKey key
   -- If you're using Brick, it's unlikely that you will be using either of these,
-  -- It might even be worth just sending them to 'Nothing' directly.
+  -- It might even be worth just sending them to 'Nothing' directly since we
+  -- don't parse mouse events.
   EvMouseDown _ _ mouseButton modifiers -> Just $ showModifiers modifiers <> showMouseButton mouseButton
   EvMouseUp _ _ mouseButtonMaybe -> Just $ maybe "Mouse" showMouseButton mouseButtonMaybe <> "Released"
   _ -> Nothing
@@ -168,7 +175,7 @@ parseModifiers s = case s of
   ('s':'-':rest) -> first (MShift:) $ parseModifiers rest
   rest -> ([], rest)
 
-parseKeyCode :: String -> Maybe Event
+parseKeyCode :: String -> Maybe KeyCode
 parseKeyCode str = (\k -> EvKey k modifiers) <$> keyCode
   where
     lowered = map toLower str

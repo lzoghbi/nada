@@ -18,6 +18,7 @@ import Nada.Types hiding (Edit)
 import Nada.App
 import Nada.Org
 import Nada.KeyBinds.IniParser
+import Nada.KeyBinds.KeyCodes (showKeyCode)
 import Nada.Types
 import Options.Applicative
 import System.Environment (lookupEnv)
@@ -210,10 +211,17 @@ complete _ _ = return ()
 main :: IO ()
 main = do
   configFile <- Text.readFile "nada.ini"
-  let keyToIdEither = parseKeyBindsFromFile configFile "KEYS" "," (M.keys idToBinding)
-  case keyToIdEither of
-    Left err -> putStrLn "Error reading config file:" *> putStrLn err
-    Right keyToId -> do
+  let resultEither = parseKeyBindsFromFile configFile "KEYS" "," (M.keys idToBinding)
+  case resultEither of
+    Left err -> do
+      putStrLn "Error reading config file:"
+      putStrLn err
+      exitFailure
+    Right (_, duplicateKeys@(_:_)) -> do
+      putStrLn "Error reading config file:"
+      putStrLn "  Duplicate keycodes: "
+      putStrLn $ "  " <> unwords (map (fromMaybe "[Unknown KeyCode]" . showKeyCode) duplicateKeys)
+    Right (keyToId, []) -> do
       defaultNadaFile <- lookupEnv "NADA_FILE"
       (argNadaFile, comm) <- execParser opts
       let maybeNadaFile = argNadaFile <|> defaultNadaFile

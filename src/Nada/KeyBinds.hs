@@ -20,13 +20,11 @@ import qualified Data.Map as M
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 
-import qualified Graphics.Vty as V
-
 data KeyBind n s = KeyBind
   { kbEvent :: EventM n s ()
   , kbName :: Maybe Text
   , kbDesc :: Maybe Text
-  , kbKeys :: [V.Event] -- ^ You should not have to set this yourself.
+  , kbKeys :: [KeyCode] -- ^ You should not have to set this yourself.
                            -- It should be set automatically 'keybinds'.
   , kbShowHelp :: Bool
   }
@@ -52,22 +50,21 @@ keyBind handle name desc showHelp = KeyBind handle name desc [] showHelp
 -- withDesc desc (KeyBind h n _d ks) = KeyBind h n (Just desc) ks
 
 -- | For internal use (see 'keybinds'), you shouldn't need to modify the keys yourself.
-addKey :: V.Event -> KeyBind n s -> KeyBind n s
+addKey :: KeyCode -> KeyBind n s -> KeyBind n s
 addKey key (KeyBind h n d keys sh) = KeyBind h n d (key:keys) sh
 
 -- -- | Specializes 'BrickEvent' to exclude 'AppEvent's. There's no reason we couldn't
 -- -- support them, but they aren't user input events so it doesn't make sense to.
 -- type UserInput n = BrickEvent n ()
-type Id = Text
 
-data KeyBindings n s = KeyBindings
-  { keybindingsIdToBinding  :: Map Id (KeyBind n s) -- ^ One-to-one
-  , keybindingsKeyToId      :: Map V.Event Id -- ^ Possibly many-to-one
+data KeyBindings id n s = KeyBindings
+  { keybindingsIdToBinding  :: Map id (KeyBind n s) -- ^ One-to-one
+  , keybindingsKeyToId      :: Map KeyCode id -- ^ Possibly many-to-one
   , keyBindingsDefaultEvent :: Maybe (EventM n s ()) -- ^ The default event to use, uses pure () if not given.
   }
 
 -- | Smart constructor that populates the 'kbKeys' of each 'KeyBind'.
-keybindings :: Map V.Event Id -> Map Id (KeyBind n s) -> Maybe (EventM n s ()) -> KeyBindings n s
+keybindings :: Ord id => Map KeyCode id -> Map id (KeyBind n s) -> Maybe (EventM n s ()) -> KeyBindings id n s
 keybindings keyToId idToBinding defaultEvent = KeyBindings idToBindingWithKeys keyToId defaultEvent
   where
     idToBindingWithKeys = M.foldrWithKey' (M.adjust . addKey) idToBinding keyToId
@@ -84,27 +81,27 @@ keybindings keyToId idToBinding defaultEvent = KeyBindings idToBindingWithKeys k
 --   MouseDown n b ms l -> MouseDown n b ms l
 --   MouseUp n b l -> MouseUp n b l
 
-drawHelpMenu :: Ord n => KeyBindings n s -> Widget n
+drawHelpMenu :: KeyBindings id n s -> Widget n
 drawHelpMenu kbs = centerLayer . border $ header <=> vBox keyBinds
   where
     header = str "Key Bindings"
-    keyBinds = map (uncurry drawKeyBind) $ M.assocs (keybindingsIdToBinding kbs)
+    keyBinds = map drawKeyBind $ M.elems (keybindingsIdToBinding kbs)
 
-drawKeyBind :: Id -> KeyBind n s -> Widget n
-drawKeyBind _ KeyBind{..}
+drawKeyBind :: KeyBind n s -> Widget n
+drawKeyBind KeyBind{..}
   | not kbShowHelp = emptyWidget
-drawKeyBind ident KeyBind{..} = (keybinds <+> str ": " <+> name) <=> desc
+drawKeyBind KeyBind{..} = (keybinds <+> str ": " <+> name) <=> desc
   where
-    name = txt $ fromMaybe ident kbName
+    name = maybe emptyWidget txt kbName
     desc = maybe emptyWidget txt kbDesc
     keybinds = str . unwords $ mapMaybe showKey kbKeys
-    showKey = fmap wrapWithBrackets . showUserInputEvent
+    showKey = fmap wrapWithBrackets . showKeyCode
     wrapWithBrackets s = "[" <> s <> "]"
 
-appEventKeyBinds :: Ord n => KeyBindings n s -> V.Event -> EventM n s ()
+appEventKeyBinds :: Ord id => KeyBindings id n s -> KeyCode -> EventM n s ()
 appEventKeyBinds (KeyBindings events ids defaultEventMaybe) event =
   case M.lookup event ids of
-    Just id -> maybe defaultEvent kbEvent $ M.lookup id events
+    Just ident -> maybe defaultEvent kbEvent $ M.lookup ident events
     Nothing -> defaultEvent
   where
     defaultEvent = fromMaybe (pure ()) defaultEventMaybe

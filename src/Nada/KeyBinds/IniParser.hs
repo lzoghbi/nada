@@ -4,16 +4,19 @@ module Nada.KeyBinds.IniParser
   , parseKeyBindsFromFile
   ) where
 
-import Nada.KeyBinds.KeyCodes (parseKeyCode)
+import Nada.KeyBinds.KeyCodes (parseKeyCode, KeyCode)
 import Data.Ini.Config
+import Data.List (nub, (\\))
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Graphics.Vty.Input.Events
 
-parseField :: Text -> Text -> SectionParser (Text, [Event])
+type Id = Text
+
+parseField :: Text -> Id -> SectionParser (Text, [KeyCode])
 parseField separator identifier = do
   keyCodesMaybe <- fieldMbOf identifier (listWithSeparator separator string)
   -- Any malformed keycodes are ignored. I would prefer to raise an
@@ -21,6 +24,9 @@ parseField separator identifier = do
   -- The proper way to circumvent this would be to do your parsing in
   -- two stages.
   pure (identifier, maybe [] (mapMaybe (parseKeyCode . T.unpack)) keyCodesMaybe)
+
+duplicates :: Eq a => [a] -> [a]
+duplicates as = as \\ nub as
 
 -- | Use this parser if you already have an INI file you're reading configs
 -- from. Otherwise, try 'parseKeyBindsFromFile'.
@@ -30,17 +36,25 @@ parseField separator identifier = do
 -- 'identifiers' that you allow keybinds for. It is up to you to enforce
 -- that the 'identifiers' you provide have matching handlers in your
 -- 'KeyBindings'.
-parseKeyBinds :: Text -> Text -> [Text] -> IniParser (Maybe (Map Event Text))
+--
+-- The '[KeyCode]' in the tuple is a list of all duplicated 'KeyCode's. This
+-- should probably result in a parse failure because the last 'Id' corresponding
+-- to a duplicated 'KeyCode' is what it will be bound to; however, in the interest
+-- of not being prescriptive this is left to the user.
+parseKeyBinds :: Text -> Text -> [Id] -> IniParser (Maybe (Map KeyCode Id, [KeyCode]))
 parseKeyBinds sectionName separator identifiers = sectionMb sectionName $ do
   entries <- traverse (parseField separator) identifiers
-  pure $ M.fromList
-    -- We need to expand 'entries :: [(Text, [Event])]' to [(Event, Text)]
-    -- in order to make it into a map.
-    [(event, identifier) | (identifier, events) <- entries, event <- events]
+  let duplicateKeyCodes = duplicates $ concatMap snd entries
+      keyCodeToId = M.fromList
+                      -- We need to expand 'entries :: [(Text, [KeyCode])]' to [(KeyCode, Text)]
+                      -- in order to make it into a map.
+                      [(keyCode, identifier) | (identifier, keyCodes) <- entries, keyCode <- keyCodes]
+  pure (keyCodeToId, duplicateKeyCodes)
 
-parseKeyBindsFromFile :: Text -> Text -> Text -> [Text] -> Either String (Map Event Text)
+-- | Parses keybinds from the contents of the INI file 'file'. Uses 'parseKeyBinds'.
+-- If there isn't anything to parse (e.g. the file is empty or the
+-- keybinds are in a different section) returns '(Map.empty, [])'.
+parseKeyBindsFromFile :: Text -> Text -> Text -> [Id] -> Either String (Map Event Id, [KeyCode])
 parseKeyBindsFromFile file sectionName separator identifiers = do
-  keyToIdMaybe <- parseIniFile file (parseKeyBinds sectionName separator identifiers)
-  case keyToIdMaybe of
-    Nothing -> Left $ "No top-level section named " <> T.unpack sectionName
-    Just keyToId -> Right keyToId
+  resultMaybe <- parseIniFile file (parseKeyBinds sectionName separator identifiers)
+  pure $ fromMaybe mempty resultMaybe
