@@ -288,8 +288,18 @@ nadaAppDraw st = case _currentMode st of
 idToBinding :: Map Text (KeyBind Name NadaState)
 idToBinding = Map.fromList
   [ ("quit", keyBind halt (Just "Quit") (Just "Exits the app") True)
-  , ("up", keyBind moveUp (Just "Move up") Nothing True)
+  , ("edit", keyBind edit (Just "Edit todo") Nothing True)
+  , ("editTags", keyBind editTags (Just "Edit tags") Nothing True)
+  , ("editDeadline", keyBind editDeadline (Just "Edit deadline") Nothing True)
   , ("down", keyBind moveDown (Just "Move down") Nothing True)
+  , ("up", keyBind moveUp (Just "Move up") Nothing True)
+  , ("deleteTodo", keyBind deleteSelectedTodo (Just "Delete todo") Nothing True)
+  , ("newTodo", keyBind newTodo (Just "New todo") Nothing True)
+  , ("toggleTodo", keyBind toggleSelectedTodo (Just "Toggle todo") Nothing True)
+  , ("switchTodoList", keyBind switchTodoList (Just "Switch todo list") Nothing True)
+  , ("calendar", keyBind calendarView (Just "Enter calendar view") (Just "Displays a calendar containing all todos with deadlines") True)
+  , ("newTodoList", keyBind newTodoList (Just "New todo list") Nothing True)
+  , ("deleteTodoList", keyBind deleteSelectedTodoList (Just "Delete todo list") Nothing True)
   , ("help", keyBind helpMenu (Just "Help menu") Nothing True)
   ]
     -- keyToId = Map.fromList
@@ -311,96 +321,36 @@ appEventNormal (VtyEvent vtyE) = do
   where
     makeKbs keyToId = keybindings keyToId idToBinding Nothing
 -- Keyboard Shortcuts
-appEventNormal (VtyEvent vtyE) = case vtyE of
-  V.EvKey (V.KChar 'q') [] -> do
-    _ <- get
-    halt
-  V.EvKey (V.KChar 'e') [] -> do
-    st <- get
-    let selTodoId = getSelectedTodoId st
-    let selTodo = st ^?! todosMap . ix selTodoId
-    todoEditor %= Ed.applyEdit (const $ textZipper (Data.Text.lines $ selTodo ^. todoName) (Just 1))
-    currentMode .= ModeEdit
-  V.EvKey (V.KChar 'r') [] -> do
-    st <- get
-    let selTodoId = getSelectedTodoId st
-    let selTodo = st ^?! todosMap . ix selTodoId
-    todoEditor %= Ed.applyEdit (const $ textZipper [Data.Text.unwords (selTodo ^. todoTags)] (Just 1))
-    currentMode .= ModeEditTag
-  V.EvKey (V.KChar 'w') [] -> do
-    st <- get
-    let selTodoId = getSelectedTodoId st
-    let selTodo = st ^?! todosMap . ix selTodoId
-    todoEditor %= Ed.applyEdit (const $ textZipper (showDate (selTodo ^. todoDueDate)) (Just 1))
-    currentMode .= ModeEditDeadline
-  V.EvKey (V.KChar 'j') [] -> do
-    listIdx <- use selectedTodoList
-    zoom (visibleTodoLists . ix (fromInteger listIdx)) $
-      do
-        tdList <- use todoList
-        selectedTodo %= min (toInteger $ length tdList - 1) . (+ 1)
-  V.EvKey (V.KChar 'k') [] -> do
-    listIdx <- use selectedTodoList
-    zoom (visibleTodoLists . ix (fromInteger listIdx)) $
-      selectedTodo %= max 0 . subtract 1
-  V.EvKey (V.KChar 'd') [] -> do
-    listIdx <- use selectedTodoList
-    zoom (visibleTodoLists . ix (fromInteger listIdx)) $
-      do
-        selIdx <- use selectedTodo
-        todoList %= Seq.deleteAt (fromInteger selIdx)
-        tdList <- use todoList
-        selectedTodo %= max 0 . min (toInteger $ length tdList - 1)
-  V.EvKey (V.KChar 'n') [] -> do
-    st <- get
-    let (st', newId) = addTodoToState st (defaultTodo 0)
-    put st'
-    listIdx <- use selectedTodoList
-    zoom (visibleTodoLists . ix (fromInteger listIdx)) $
-      do
-        todoList %= (Seq.|> newId)
-        tdList <- use todoList
-        selectedTodo .= toInteger (length tdList - 1)
-  -- Might want to create a lensSelectedTodoList and lensSelectedTodo
-  V.EvKey (V.KChar 't') [] -> do
-    st <- get
-    let selTodoId = getSelectedTodoId st
-    todosMap . ix selTodoId . todoCompleted %= not
-  V.EvKey (V.KChar 'o') [] -> do
-                                st <- get
-                                let nTodoLists = length $ st ^. visibleTodoLists
-                                selectedTodoList += 1
-                                selectedTodoList %= \i -> if i >= toInteger nTodoLists 
-                                                            then 0 
-                                                            else i
-                                return ()
-  V.EvKey (V.KChar 'c') [] -> do
-                                freshCalendarState <- liftIO $ makeCalendarStateForCurrentDay
-                                todos <- getBareTodosByDate <$> get
-                                let cs = freshCalendarState{calendarWidgets = addToCalendarWidgets todos}
-                                modify (calendarState .~ cs)
-                                modify (currentMode .~ ModeCalendar)
-  V.EvKey (V.KChar 'w') [] -> do
-                                st <- get
-                                let (st', newId) = addTodoToState st (defaultTodo 0)
-                                put st'
-                                let newList = defaultTodoList & todoListName .~ "More todos"
-                                                              & todoList .~ Seq.fromList [newId]
-                                id %= addTodoListToState newList
-                                todoLists <- use visibleTodoLists
-                                let nTodoLists = length $ todoLists
-                                selectedTodoList .= toInteger nTodoLists - 1
-  V.EvKey (V.KChar 'x') [] -> do
-                                todoLists <- use visibleTodoLists
-                                sel <- use selectedTodoList
-                                let (l, r) = splitAt (fromInteger sel) todoLists
-                                let newTodoLists = l ++ tail r
-                                visibleTodoLists .= newTodoLists
-                                selectedTodoList %= max 0 . min (toInteger $ length newTodoLists - 1)
-                            
-  _ -> return ()
 appEventNormal _ = return ()
 
+-- e
+edit :: EventM Name NadaState ()
+edit = do
+  st <- get
+  let selTodoId = getSelectedTodoId st
+  let selTodo = st ^?! todosMap . ix selTodoId
+  todoEditor %= Ed.applyEdit (const $ textZipper (Data.Text.lines $ selTodo ^. todoName) (Just 1))
+  currentMode .= ModeEdit
+
+-- r
+editTags :: EventM Name NadaState ()
+editTags = do
+  st <- get
+  let selTodoId = getSelectedTodoId st
+  let selTodo = st ^?! todosMap . ix selTodoId
+  todoEditor %= Ed.applyEdit (const $ textZipper [Data.Text.unwords (selTodo ^. todoTags)] (Just 1))
+  currentMode .= ModeEditTag
+
+-- w
+editDeadline :: EventM Name NadaState ()
+editDeadline = do
+  st <- get
+  let selTodoId = getSelectedTodoId st
+  let selTodo = st ^?! todosMap . ix selTodoId
+  todoEditor %= Ed.applyEdit (const $ textZipper (showDate (selTodo ^. todoDueDate)) (Just 1))
+  currentMode .= ModeEditDeadline
+
+-- j
 moveDown :: EventM Name NadaState ()
 moveDown = do
   listIdx <- use selectedTodoList
@@ -409,12 +359,89 @@ moveDown = do
       tdList <- use todoList
       selectedTodo %= min (toInteger $ length tdList - 1) . (+ 1)
 
+-- k
 moveUp :: EventM Name NadaState ()
 moveUp = do
   listIdx <- use selectedTodoList
   zoom (visibleTodoLists . ix (fromInteger listIdx)) $
     selectedTodo %= max 0 . subtract 1
 
+-- d
+deleteSelectedTodo :: EventM Name NadaState ()
+deleteSelectedTodo = do
+  listIdx <- use selectedTodoList
+  zoom (visibleTodoLists . ix (fromInteger listIdx)) $
+    do
+      selIdx <- use selectedTodo
+      todoList %= Seq.deleteAt (fromInteger selIdx)
+      tdList <- use todoList
+      selectedTodo %= max 0 . min (toInteger $ length tdList - 1)
+
+-- n
+-- Might want to create a lensSelectedTodoList and lensSelectedTodo
+newTodo :: EventM Name NadaState ()
+newTodo = do
+  st <- get
+  let (st', newId) = addTodoToState st (defaultTodo 0)
+  put st'
+  listIdx <- use selectedTodoList
+  zoom (visibleTodoLists . ix (fromInteger listIdx)) $
+    do
+      todoList %= (Seq.|> newId)
+      tdList <- use todoList
+      selectedTodo .= toInteger (length tdList - 1)
+
+-- t
+toggleSelectedTodo :: EventM Name NadaState ()
+toggleSelectedTodo = do
+  st <- get
+  let selTodoId = getSelectedTodoId st
+  todosMap . ix selTodoId . todoCompleted %= not
+
+-- o
+switchTodoList :: EventM Name NadaState ()
+switchTodoList = do
+  st <- get
+  let nTodoLists = length $ st ^. visibleTodoLists
+  selectedTodoList += 1
+  selectedTodoList %= \i -> if i >= toInteger nTodoLists
+                              then 0
+                              else i
+  return ()
+
+-- c
+calendarView :: EventM Name NadaState ()
+calendarView = do
+  freshCalendarState <- liftIO $ makeCalendarStateForCurrentDay
+  todos <- getBareTodosByDate <$> get
+  let cs = freshCalendarState{calendarWidgets = addToCalendarWidgets todos}
+  modify (calendarState .~ cs)
+  modify (currentMode .~ ModeCalendar)
+
+-- p
+newTodoList :: EventM Name NadaState ()
+newTodoList = do
+  st <- get
+  let (st', newId) = addTodoToState st (defaultTodo 0)
+  put st'
+  let newList = defaultTodoList & todoListName .~ "More todos"
+                              & todoList .~ Seq.fromList [newId]
+  id %= addTodoListToState newList
+  todoLists <- use visibleTodoLists
+  let nTodoLists = length $ todoLists
+  selectedTodoList .= toInteger nTodoLists - 1
+
+-- x
+deleteSelectedTodoList :: EventM Name NadaState ()
+deleteSelectedTodoList = do
+  todoLists <- use visibleTodoLists
+  sel <- use selectedTodoList
+  let (l, r) = splitAt (fromInteger sel) todoLists
+  let newTodoLists = l ++ tail r
+  visibleTodoLists .= newTodoLists
+  selectedTodoList %= max 0 . min (toInteger $ length newTodoLists - 1)
+
+-- ?
 helpMenu :: EventM Name NadaState ()
 helpMenu = currentMode .= ModeShowHelpMenu
 
