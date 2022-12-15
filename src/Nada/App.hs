@@ -273,7 +273,7 @@ vp0Scroll = M.viewportScroll mkNadaVP
 nadaAppDraw :: NadaState -> [Widget Name]
 nadaAppDraw st = case _currentMode st of
   ModeCalendar -> [drawCalendar (_calendarState st)]
-  ModeShowHelpMenu -> [drawHelpMenu kbs, ui]
+  ModeShowHelpMenu -> [drawHelpMenuForIds identifiers kbs, ui]
   _            -> [ui]
   where
     ui =
@@ -285,22 +285,40 @@ nadaAppDraw st = case _currentMode st of
         ]
     kbs = keybindings (st ^. keyToId) idToBinding Nothing
 
+identifiers :: [Text]
+identifiers =
+  [ "quit"
+  , "edit"
+  , "editTags"
+  , "editDeadline"
+  , "down"
+  , "up"
+  , "deleteTodo"
+  , "newTodo"
+  , "toggleTodo"
+  , "switchTodoList"
+  , "calendar"
+  , "newTodoList"
+  , "deleteTodoList"
+  , "help"
+  ]
+
 idToBinding :: Map Text (KeyBind Name NadaState)
-idToBinding = Map.fromList
-  [ ("quit", keyBind halt (Just "Quit") (Just "Exits the app") True)
-  , ("edit", keyBind edit (Just "Edit todo") Nothing True)
-  , ("editTags", keyBind editTags (Just "Edit tags") Nothing True)
-  , ("editDeadline", keyBind editDeadline (Just "Edit deadline") Nothing True)
-  , ("down", keyBind moveDown (Just "Move down") Nothing True)
-  , ("up", keyBind moveUp (Just "Move up") Nothing True)
-  , ("deleteTodo", keyBind deleteSelectedTodo (Just "Delete todo") Nothing True)
-  , ("newTodo", keyBind newTodo (Just "New todo") Nothing True)
-  , ("toggleTodo", keyBind toggleSelectedTodo (Just "Toggle todo") Nothing True)
-  , ("switchTodoList", keyBind switchTodoList (Just "Switch todo list") Nothing True)
-  , ("calendar", keyBind calendarView (Just "Enter calendar view") (Just "Displays a calendar containing all todos with deadlines") True)
-  , ("newTodoList", keyBind newTodoList (Just "New todo list") Nothing True)
-  , ("deleteTodoList", keyBind deleteSelectedTodoList (Just "Delete todo list") Nothing True)
-  , ("help", keyBind helpMenu (Just "Help menu") Nothing True)
+idToBinding = Map.fromList $ zip identifiers
+  [ keyBind halt (Just "Quit") (Just "Exits the app")
+  , keyBind edit (Just "Edit todo") Nothing
+  , keyBind editTags (Just "Edit tags") Nothing
+  , keyBind editDeadline (Just "Edit deadline") Nothing
+  , keyBind moveDown (Just "Move down") Nothing
+  , keyBind moveUp (Just "Move up") Nothing
+  , keyBind deleteSelectedTodo (Just "Delete todo") Nothing
+  , keyBind newTodo (Just "New todo") Nothing
+  , keyBind toggleSelectedTodo (Just "Toggle todo") Nothing
+  , keyBind switchTodoList (Just "Switch todo list") Nothing
+  , keyBind calendarView (Just "Enter calendar view") (Just "Displays a calendar containing all todos with deadlines")
+  , keyBind newTodoList (Just "New todo list") Nothing
+  , keyBind deleteSelectedTodoList (Just "Delete todo list") Nothing
+  , keyBind helpMenu (Just "Help menu") Nothing
   ]
     -- keyToId = Map.fromList
     --   [ (V.EvKey (V.KChar 'q') [], "quit")

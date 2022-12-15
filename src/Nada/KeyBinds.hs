@@ -7,6 +7,7 @@ module Nada.KeyBinds
   , KeyBindings
   , keybindings
   , drawHelpMenu
+  , drawHelpMenuForIds
   , appEventKeyBinds
   ) where
 
@@ -26,15 +27,14 @@ data KeyBind n s = KeyBind
   , kbDesc :: Maybe Text
   , kbKeys :: [KeyCode] -- ^ You should not have to set this yourself.
                            -- It should be set automatically 'keybinds'.
-  , kbShowHelp :: Bool
   }
 
 -- | Smart constructor that creates a 'KeyBind'.
 -- If you don't want to provide a name and description, see 'fromEvent'.
 --
 -- Initializes the 'kbKeys' to the empty list - it will be autopopulated in 'keybinds'.
-keyBind :: EventM n s () -> Maybe Text -> Maybe Text -> Bool -> KeyBind n s
-keyBind handle name desc showHelp = KeyBind handle name desc [] showHelp
+keyBind :: EventM n s () -> Maybe Text -> Maybe Text -> KeyBind n s
+keyBind handle name desc = KeyBind handle name desc []
 
 -- -- | Generates a 'KeyBind' without a name or description.
 -- -- See 'withName' and 'withDesc' if you want to add one, or 'keyBindEvent' if you want to add both.
@@ -51,7 +51,7 @@ keyBind handle name desc showHelp = KeyBind handle name desc [] showHelp
 
 -- | For internal use (see 'keybinds'), you shouldn't need to modify the keys yourself.
 addKey :: KeyCode -> KeyBind n s -> KeyBind n s
-addKey key (KeyBind h n d keys sh) = KeyBind h n d (key:keys) sh
+addKey key (KeyBind h n d keys) = KeyBind h n d (key:keys)
 
 -- -- | Specializes 'BrickEvent' to exclude 'AppEvent's. There's no reason we couldn't
 -- -- support them, but they aren't user input events so it doesn't make sense to.
@@ -81,16 +81,22 @@ keybindings keyToId idToBinding defaultEvent = KeyBindings idToBindingWithKeys k
 --   MouseDown n b ms l -> MouseDown n b ms l
 --   MouseUp n b l -> MouseUp n b l
 
-drawHelpMenu :: KeyBindings id n s -> Widget n
-drawHelpMenu kbs = centerLayer . border $ header <=> vBox keyBinds
+-- | Draws a help menu using the keys of 'keybindingsIdToBinding'. If you want
+-- to control what gets shown or what order they appear, use 'drawHelpMenuForIds'.
+drawHelpMenu :: Ord id => KeyBindings id n s -> Widget n
+drawHelpMenu kbs = drawHelpMenuForIds (M.keys $ keybindingsIdToBinding kbs) kbs
+
+-- | Draws a help menu for the 'ids' in the order they appear.
+-- If an identifier is not matched in 'keybindingsIdToBinding',
+-- we simply do not draw anything.
+drawHelpMenuForIds :: Ord id => [id] -> KeyBindings id n s -> Widget n
+drawHelpMenuForIds ids kbs = centerLayer . border $ header <=> vBox keyBinds
   where
     header = str "Key Bindings"
-    keyBinds = map drawKeyBind $ M.elems (keybindingsIdToBinding kbs)
+    keyBinds = map drawKeyBind $ mapMaybe (\ident -> M.lookup ident (keybindingsIdToBinding kbs)) ids
 
 drawKeyBind :: KeyBind n s -> Widget n
-drawKeyBind KeyBind{..}
-  | not kbShowHelp = emptyWidget
-drawKeyBind KeyBind{..} = (keybinds <+> str ": " <+> name) <=> desc
+drawKeyBind KeyBind{..} = (name <+> str ": " <+> keybinds) <=> desc
   where
     name = maybe emptyWidget txt kbName
     desc = maybe emptyWidget txt kbDesc
@@ -106,5 +112,5 @@ appEventKeyBinds (KeyBindings events ids defaultEventMaybe) event =
   where
     defaultEvent = fromMaybe (pure ()) defaultEventMaybe
 
--- TODO: Make IdToBinding an ordered map.
+-- TODO: Better styling for help menu
 -- TODO: Figure out how to support key bindings in a named context (i.e. BrickEvent n ()).
