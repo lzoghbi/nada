@@ -306,20 +306,20 @@ identifiers =
 
 idToBinding :: Map Text (KeyBind Name NadaState)
 idToBinding = Map.fromList $ zip identifiers
-  [ keyBind halt (Just "Quit") (Just "Exits the app")
-  , keyBind edit (Just "Edit todo") Nothing
-  , keyBind editTags (Just "Edit tags") Nothing
-  , keyBind editDeadline (Just "Edit deadline") Nothing
-  , keyBind moveDown (Just "Move down") Nothing
-  , keyBind moveUp (Just "Move up") Nothing
-  , keyBind deleteSelectedTodo (Just "Delete todo") Nothing
-  , keyBind newTodo (Just "New todo") Nothing
-  , keyBind toggleSelectedTodo (Just "Toggle todo") Nothing
-  , keyBind switchTodoList (Just "Switch todo list") Nothing
-  , keyBind calendarView (Just "Calendar view") (Just "Displays a calendar containing all todos with deadlines")
-  , keyBind newTodoList (Just "New todo list") Nothing
-  , keyBind deleteSelectedTodoList (Just "Delete todo list") Nothing
-  , keyBind helpMenu (Just "Help menu") Nothing
+  [ keyBind halt (Just "Quit")
+  , keyBind edit (Just "Edit todo")
+  , keyBind editTags (Just "Edit tags")
+  , keyBind editDeadline (Just "Edit deadline")
+  , keyBind moveDown (Just "Move down")
+  , keyBind moveUp (Just "Move up")
+  , keyBind deleteSelectedTodo (Just "Delete todo")
+  , keyBind newTodo (Just "New todo")
+  , keyBind toggleSelectedTodo (Just "Toggle todo")
+  , keyBind switchTodoList (Just "Switch todo list")
+  , keyBind calendarView (Just "Calendar view")
+  , keyBind newTodoList (Just "New todo list")
+  , keyBind deleteSelectedTodoList (Just "Delete todo list")
+  , keyBind helpMenu (Just "Help menu")
   ]
     -- keyToId = Map.fromList
     --   [ (V.EvKey (V.KChar 'q') [], "quit")
@@ -555,8 +555,7 @@ theMap =
     , (attrName "deadline",  V.withStyle (fg V.blue) V.italic)
     , (attrName "todoname", V.withStyle (V.defAttr) V.bold)
     , (kbNameAttr, V.defAttr)
-    , (kbKeysAttr, V.red `on` V.black)
-    , (kbDescAttr, V.withStyle V.defAttr V.italic)
+    , (kbKeysAttr, V.white `on` V.red)
     -- , (Ed.editAttr,                   V.white `on` V.blue)
     -- , (Ed.editFocusedAttr,            V.black `on` V.yellow)
     ]

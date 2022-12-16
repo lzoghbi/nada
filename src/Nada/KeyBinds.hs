@@ -9,7 +9,7 @@ module Nada.KeyBinds
   -- * Drawing
   , kbNameAttr
   , kbKeysAttr
-  , kbDescAttr
+  -- , kbDescAttr
   , drawHelpMenu
   , drawHelpMenuForIds
   -- * Handling events
@@ -19,18 +19,17 @@ module Nada.KeyBinds
 import Nada.KeyBinds.KeyCodes
 
 import Brick
-import Brick.Widgets.Border (border, hBorder, borderWithLabel)
-import Brick.Widgets.Center (centerLayer, hCenter)
+import Brick.Widgets.Border (borderWithLabel)
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe, mapMaybe, isJust)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 
 data KeyBind n s = KeyBind
   { kbEvent :: EventM n s ()
   , kbName :: Maybe Text -- ^ Optional: will not render in the help menu if not provided.
-  , kbDesc :: Maybe Text -- ^ Optional.
+  -- , kbDesc :: Maybe Text -- ^ Optional.
   , kbKeys :: [KeyCode] -- ^ You should not have to set this yourself.
                            -- It should be set automatically 'keybinds'.
   }
@@ -39,8 +38,8 @@ data KeyBind n s = KeyBind
 -- If you don't want to provide a name and description, see 'fromEvent'.
 --
 -- Initializes the 'kbKeys' to the empty list - it will be autopopulated in 'keybinds'.
-keyBind :: EventM n s () -> Maybe Text -> Maybe Text -> KeyBind n s
-keyBind handle name desc = KeyBind handle name desc []
+keyBind :: EventM n s () -> Maybe Text -> KeyBind n s
+keyBind handle name = KeyBind handle name []
 
 -- -- | Generates a 'KeyBind' without a name or description.
 -- -- See 'withName' and 'withDesc' if you want to add one, or 'keyBindEvent' if you want to add both.
@@ -57,7 +56,7 @@ keyBind handle name desc = KeyBind handle name desc []
 
 -- | For internal use (see 'keybinds'), you shouldn't need to modify the keys yourself.
 addKey :: KeyCode -> KeyBind n s -> KeyBind n s
-addKey key (KeyBind h n d keys) = KeyBind h n d (key:keys)
+addKey key (KeyBind h n keys) = KeyBind h n (key:keys)
 
 -- -- | Specializes 'BrickEvent' to exclude 'AppEvent's. There's no reason we couldn't
 -- -- support them, but they aren't user input events so it doesn't make sense to.
@@ -93,8 +92,8 @@ kbNameAttr = attrName "keyBindName"
 kbKeysAttr :: AttrName
 kbKeysAttr = attrName "keyBindKeys"
 
-kbDescAttr :: AttrName
-kbDescAttr = attrName "keyBindDesc"
+-- kbDescAttr :: AttrName
+-- kbDescAttr = attrName "keyBindDesc"
 
 -- | Draws a help menu using the keys of 'keybindingsIdToBinding'. If you want
 -- to control what gets shown or what order they appear, use 'drawHelpMenuForIds'.
@@ -123,7 +122,7 @@ drawHelpMenuForIds menuLabel ids kbs = borderWithLabel menuLabel menuEntries
 drawKeyBind :: Int -> KeyBind n s -> Widget n
 drawKeyBind maxLength KeyBind{..} = case kbName of
   Nothing -> emptyWidget
-  Just kbName' -> drawName kbName' <+> drawKeys kbKeys -- TODO: <=> drawDesc kbDesc
+  Just kbName' -> drawName kbName' <+> drawKeys kbKeys -- <=> drawDesc kbDesc
   where
     -- The +1 ensures that there's a gap between the name and keys
     drawName name = withAttr kbNameAttr .
@@ -132,8 +131,8 @@ drawKeyBind maxLength KeyBind{..} = case kbName of
       str . unwords . mapMaybe showKey
     showKey = fmap wrapWithBrackets . showKeyCode
     wrapWithBrackets s = "[" <> s <> "]"
-    drawDesc = withAttr kbDescAttr .
-      maybe emptyWidget txt
+    -- drawDesc = withAttr kbDescAttr .
+    --   maybe emptyWidget txt
 
 appEventKeyBinds :: Ord id => KeyBindings id n s -> KeyCode -> EventM n s ()
 appEventKeyBinds (KeyBindings events ids defaultEventMaybe) event =
