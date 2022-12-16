@@ -6,25 +6,31 @@ module Nada.KeyBinds
     -- * 'KeyBinds'
   , KeyBindings
   , keybindings
+  -- * Drawing
+  , kbNameAttr
+  , kbKeysAttr
+  , kbDescAttr
   , drawHelpMenu
   , drawHelpMenuForIds
+  -- * Handling events
   , appEventKeyBinds
   ) where
 
 import Nada.KeyBinds.KeyCodes
 
 import Brick
-import Brick.Widgets.Border (border)
-import Brick.Widgets.Center (centerLayer)
+import Brick.Widgets.Border (border, hBorder, borderWithLabel)
+import Brick.Widgets.Center (centerLayer, hCenter)
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe, isJust)
 import Data.Text (Text)
+import qualified Data.Text as T
 
 data KeyBind n s = KeyBind
   { kbEvent :: EventM n s ()
-  , kbName :: Maybe Text
-  , kbDesc :: Maybe Text
+  , kbName :: Maybe Text -- ^ Optional: will not render in the help menu if not provided.
+  , kbDesc :: Maybe Text -- ^ Optional.
   , kbKeys :: [KeyCode] -- ^ You should not have to set this yourself.
                            -- It should be set automatically 'keybinds'.
   }
@@ -81,28 +87,53 @@ keybindings keyToId idToBinding defaultEvent = KeyBindings idToBindingWithKeys k
 --   MouseDown n b ms l -> MouseDown n b ms l
 --   MouseUp n b l -> MouseUp n b l
 
+kbNameAttr :: AttrName
+kbNameAttr = attrName "keyBindName"
+
+kbKeysAttr :: AttrName
+kbKeysAttr = attrName "keyBindKeys"
+
+kbDescAttr :: AttrName
+kbDescAttr = attrName "keyBindDesc"
+
 -- | Draws a help menu using the keys of 'keybindingsIdToBinding'. If you want
 -- to control what gets shown or what order they appear, use 'drawHelpMenuForIds'.
-drawHelpMenu :: Ord id => KeyBindings id n s -> Widget n
-drawHelpMenu kbs = drawHelpMenuForIds (M.keys $ keybindingsIdToBinding kbs) kbs
+drawHelpMenu :: Ord id => Widget n -> KeyBindings id n s -> Widget n
+drawHelpMenu menuLabel kbs = drawHelpMenuForIds menuLabel (M.keys $ keybindingsIdToBinding kbs) kbs
 
 -- | Draws a help menu for the 'ids' in the order they appear.
+-- Uses 'menuLabel' as the label for the menu.
 -- If an identifier is not matched in 'keybindingsIdToBinding',
--- we simply do not draw anything.
-drawHelpMenuForIds :: Ord id => [id] -> KeyBindings id n s -> Widget n
-drawHelpMenuForIds ids kbs = centerLayer . border $ header <=> vBox keyBinds
+-- we simply do not draw anything. Similarly, if the 'kbName' is 'Nothing',
+-- we do not draw the keybinding.
+--
+-- I considered making it more customizable, but this function is pretty simple
+-- (ignoring the alignemnt hacks) so if you want to do anything more custom with
+-- rendering a help menu then please copy and extend or roll your own.
+drawHelpMenuForIds :: Ord id => Widget n -> [id] -> KeyBindings id n s -> Widget n
+drawHelpMenuForIds menuLabel ids kbs = borderWithLabel menuLabel menuEntries
   where
-    header = str "Key Bindings"
-    keyBinds = map drawKeyBind $ mapMaybe (\ident -> M.lookup ident (keybindingsIdToBinding kbs)) ids
+    keyBinds =
+      -- Ignore any identifiers without a corresponding 'KeyBind'
+      mapMaybe (\ident -> M.lookup ident (keybindingsIdToBinding kbs)) ids
+    maxLength = foldr (\kb maxSoFar -> max maxSoFar $ maybe 0 T.length (kbName kb)) 0 keyBinds
+    menuEntries = vBox $ map (drawKeyBind maxLength) keyBinds
 
-drawKeyBind :: KeyBind n s -> Widget n
-drawKeyBind KeyBind{..} = (name <+> str ": " <+> keybinds) <=> desc
+-- | Left-aligns the names and key binds.
+drawKeyBind :: Int -> KeyBind n s -> Widget n
+drawKeyBind maxLength KeyBind{..} = case kbName of
+  Nothing -> emptyWidget
+  Just kbName' -> drawName kbName' <+> drawKeys kbKeys -- TODO: <=> drawDesc kbDesc
   where
-    name = maybe emptyWidget txt kbName
-    desc = maybe emptyWidget txt kbDesc
-    keybinds = str . unwords $ mapMaybe showKey kbKeys
+    -- The +1 ensures that there's a gap between the name and keys
+    drawName name = withAttr kbNameAttr .
+      padRight (Pad $ 1 + maxLength - T.length name) $ txt name
+    drawKeys = withAttr kbKeysAttr .
+      str . unwords . mapMaybe showKey
     showKey = fmap wrapWithBrackets . showKeyCode
     wrapWithBrackets s = "[" <> s <> "]"
+    drawDesc = withAttr kbDescAttr .
+      maybe emptyWidget txt
 
 appEventKeyBinds :: Ord id => KeyBindings id n s -> KeyCode -> EventM n s ()
 appEventKeyBinds (KeyBindings events ids defaultEventMaybe) event =
@@ -112,5 +143,5 @@ appEventKeyBinds (KeyBindings events ids defaultEventMaybe) event =
   where
     defaultEvent = fromMaybe (pure ()) defaultEventMaybe
 
--- TODO: Better styling for help menu
+-- TODO: Figure out how to render description
 -- TODO: Figure out how to support key bindings in a named context (i.e. BrickEvent n ()).

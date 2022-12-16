@@ -29,6 +29,7 @@ import Text.Wrap
   )
 
 import Brick
+import Brick.Widgets.Center (centerLayer)
 import qualified Brick.AttrMap as A
 import Brick.Main as M
 import qualified Brick.Types as T
@@ -273,7 +274,7 @@ vp0Scroll = M.viewportScroll mkNadaVP
 nadaAppDraw :: NadaState -> [Widget Name]
 nadaAppDraw st = case _currentMode st of
   ModeCalendar -> [drawCalendar (_calendarState st)]
-  ModeShowHelpMenu -> [drawHelpMenuForIds identifiers kbs, ui]
+  ModeShowHelpMenu -> [centerLayer $ drawHelpMenuForIds (str "Key Bindings") identifiers kbs, ui]
   _            -> [ui]
   where
     ui =
@@ -315,7 +316,7 @@ idToBinding = Map.fromList $ zip identifiers
   , keyBind newTodo (Just "New todo") Nothing
   , keyBind toggleSelectedTodo (Just "Toggle todo") Nothing
   , keyBind switchTodoList (Just "Switch todo list") Nothing
-  , keyBind calendarView (Just "Enter calendar view") (Just "Displays a calendar containing all todos with deadlines")
+  , keyBind calendarView (Just "Calendar view") (Just "Displays a calendar containing all todos with deadlines")
   , keyBind newTodoList (Just "New todo list") Nothing
   , keyBind deleteSelectedTodoList (Just "Delete todo list") Nothing
   , keyBind helpMenu (Just "Help menu") Nothing
@@ -553,6 +554,9 @@ theMap =
     , (editingAttr, V.white `on` V.blue)
     , (attrName "deadline",  V.withStyle (fg V.blue) V.italic)
     , (attrName "todoname", V.withStyle (V.defAttr) V.bold)
+    , (kbNameAttr, V.defAttr)
+    , (kbKeysAttr, V.red `on` V.black)
+    , (kbDescAttr, V.withStyle V.defAttr V.italic)
     -- , (Ed.editAttr,                   V.white `on` V.blue)
     -- , (Ed.editFocusedAttr,            V.black `on` V.yellow)
     ]
